@@ -1,0 +1,8 @@
+data/
+__pycache__/
+*.pyc
+*.env
+.env
+# Never commit workbooks: they contain patient and case data.
+*.xlsm
+uploads/

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ t('periods') }}{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>{{ t('periods') }}</h1>
+  <div class="sub">{{ pick('Close a month when CNHI approves its report: its figures are frozen as approved (Decision D-11). Reopen only to restate, and record why.',
+                           'أقفل الشهر عند اعتماد المركز لتقريره لتثبيت أرقامه. أعد فتحه فقط لإعادة البيان مع ذكر السبب.') }}</div></div></div>
+<div class="card wide"><table class="t"><thead><tr><th>{{ pick('Month', 'الشهر') }}</th><th>{{ pick('Status', 'الحالة') }}</th><th>{{ pick('Note', 'ملاحظة') }}</th><th></th></tr></thead><tbody>
+{% for m in months %}{% set s = snaps.get(m) %}
+<tr><td><b>{{ m }}</b></td>
+  <td>{% if s %}<span class="badge ok">{{ t('approved') }}</span> {{ s.created_at[:16] }} · {{ s.created_by }}{% else %}<span class="badge warn">{{ t('provisional') }}</span>{% endif %}</td>
+  <td>{{ s.note if s else '' }}</td>
+  <td><form method="post" class="inline">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="month" value="{{ m }}">
+    {% if s %}<button class="btn small" name="act" value="reopen" data-confirm="Reopen {{ m }}? Its figures become live again.">{{ pick('Reopen', 'إعادة فتح') }}</button>
+    {% else %}<input name="note" placeholder="{{ pick('Approval reference', 'مرجع الاعتماد') }}" maxlength="300">
+      <button class="btn small primary" name="act" value="close" data-confirm="Freeze {{ m }} with the data published now?">{{ pick('Close month', 'إقفال الشهر') }}</button>{% endif %}
+  </form></td></tr>
+{% else %}<tr><td colspan="4" class="muted">-</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

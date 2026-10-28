@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ t('audit') }}{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>{{ t('audit') }}</h1><div class="sub">{{ pick('Latest 500 events', 'آخر 500 حدث') }}</div></div></div>
+<div class="card wide"><div class="tablewrap"><table class="t"><thead><tr><th>{{ pick('When', 'الوقت') }}</th><th>{{ pick('User', 'المستخدم') }}</th><th>{{ pick('Action', 'الإجراء') }}</th><th>{{ pick('Detail', 'التفاصيل') }}</th><th>IP</th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.created_at }}</td><td>{{ r.user_label }}</td><td>{{ r.action }}</td><td>{{ r.detail }}</td><td>{{ r.ip }}</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

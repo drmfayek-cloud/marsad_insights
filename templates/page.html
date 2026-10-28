@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ pick(pg.en, pg.ar) }}{% endblock %}
+
+{% macro kpi_card(k, r, wide=False) %}
+<article class="card kpi state-{{ r.state }}{{ ' wide' if wide or r.chart or r.table }}">
+  <header>
+    <span class="kid">{{ k.id }}</span>
+    <h3>{{ pick(k.name_en, k.name_ar) }}</h3>
+  </header>
+  {% if r.state == 'nodata' %}
+    <div class="v pending">{{ t('capture') }}</div>
+    <div class="note">{{ r.note }}</div>
+  {% elif r.state == 'error' %}
+    <div class="v pending">-</div><div class="note">{{ r.note }}</div>
+  {% else %}
+    <div class="v">{{ r.value if r.value is not none else '-' }}</div>
+    {% if r.sub %}<div class="s">{{ r.sub }}</div>{% endif %}
+    {% if r.state == 'partial' and r.note %}<div class="note">{{ r.note }}</div>{% endif %}
+    {% if r.chart %}<div class="chartbox">{{ r.chart }}</div>{% endif %}
+    {% if r.table and r.table.rows %}
+    <div class="tablewrap"><table class="t"><thead><tr>{% for h in r.table.headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in r.table.rows %}<tr>{% for c in row %}<td>{{ c }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+    {% endif %}
+  {% endif %}
+  <details class="def">
+    <summary>{{ t('definition') }}</summary>
+    <p>{{ pick(k.def_en, k.def_ar) }}</p>
+    <p class="small"><b>{{ pick('Formula', 'المعادلة') }}:</b> {{ k.formula }}</p>
+    <p class="small"><b>{{ t('source') }}:</b> {{ k.source }}{% if k.source_columns %} — {{ k.source_columns }}{% endif %}</p>
+    {% if k.caveat %}<p class="small"><b>{{ t('caveat') }}:</b> {{ k.caveat }}</p>{% endif %}
+    {% if k.decisions %}<p class="small muted">{{ pick('Decisions', 'القرارات') }}: {{ k.decisions }}</p>{% endif %}
+  </details>
+</article>
+{% endmacro %}
+
+{% block content %}
+<div class="pagehead">
+  <div>
+    <h1>{{ pick(pg.en, pg.ar) }}</h1>
+    <div class="sub">
+      {% if badge == 'approved' %}<span class="badge ok">{{ t('approved') }}</span> {{ t('approved_note') }}
+      {% elif badge == 'filtered' %}<span class="badge warn">{{ t('provisional') }}</span> {{ t('filtered_note') }}
+      {% else %}<span class="badge warn">{{ t('provisional') }}</span> {{ t('provisional_note') }}{% endif %}
+      {% if as_of %} · {{ t('as_of') }} {{ as_of }}{% endif %}
+    </div>
+  </div>
+  <form class="filters" method="get">
+    <label>{{ t('period') }}
+      <select name="period" data-auto>
+        <option value="all" {{ 'selected' if period == 'all' }}>{{ t('all_months') }}</option>
+        {% for m in months|reverse %}<option value="{{ m }}" {{ 'selected' if period == m }}>{{ m }}</option>{% endfor %}
+      </select></label>
+    <label>{{ t('tpa') }}
+      <select name="tpa" data-auto>
+        <option value="">{{ t('all_tpas') }}</option>
+        {% for x in tpas %}<option value="{{ x }}" {{ 'selected' if tpa == x }}>{{ x }}</option>{% endfor %}
+      </select></label>
+    <noscript><button class="btn">{{ t('apply') }}</button></noscript>
+  </form>
+</div>
+
+{% if not has_data %}
+  <div class="card"><p>{{ t('no_data_yet') }}</p></div>
+{% elif pg.code == 'EX' %}
+  <h2 class="sect">{{ t('headline') }}</h2>
+  <div class="grid tiles">
+    {% for k in defs if k.placement.endswith('headline tile') %}{{ kpi_card(k, results[k.id]) }}{% endfor %}
+  </div>
+  <h2 class="sect">{{ t('secondary') }}</h2>
+  <div class="grid tiles">
+    {% for k in defs if k.placement.endswith('secondary row') %}{{ kpi_card(k, results[k.id]) }}{% endfor %}
+  </div>
+  {% if trend %}<h2 class="sect">{{ t('trend') }}</h2>
+  <div class="grid">
+    <div class="card wide"><h3>{{ t('encounters') }}</h3><div class="chartbox">{{ trend.volume }}</div></div>
+    <div class="card wide"><h3>{{ pick('Finding rate in reviewed encounters', 'نسبة الحالات ذات الملاحظات') }}</h3><div class="chartbox">{{ trend.rate }}</div>
+      <p class="small muted">{{ pick('Encounters are screened against risk rules; the rate is not an error rate for all approvals (D-08).', 'تخضع الحالات لقواعد المخاطر، فلا تمثل النسبة معدل خطأ لكل الموافقات.') }}</p></div>
+  </div>{% endif %}
+{% else %}
+  <div class="grid">
+    {% for k in defs %}{{ kpi_card(k, results[k.id]) }}{% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

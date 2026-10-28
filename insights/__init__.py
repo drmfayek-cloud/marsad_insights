@@ -1,0 +1,1 @@
+"""MARSAD Insights application package."""

@@ -1,0 +1,12 @@
+# Production on an approved in-Kingdom server, behind your HTTPS reverse proxy (see deploy/nginx.conf).
+services:
+  insights:
+    build: .
+    restart: unless-stopped
+    env_file: insights.env
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - insights-data:/data
+volumes:
+  insights-data:

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ t('sign_in') }}{% endblock %}
+{% block auth %}
+<div class="authcard">
+  <h1>{{ t('app') }}</h1>
+  <p class="muted">{{ t('tagline') }}</p>
+  <form method="post">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <label>{{ t('email') }}<input type="email" name="email" required autocomplete="username"></label>
+    <label>{{ t('password') }}<input type="password" name="password" required autocomplete="current-password"></label>
+    <button class="btn primary">{{ t('sign_in') }}</button>
+  </form>
+  {% if demo_users %}
+  <div class="demo">
+    <p class="small"><b>{{ t('demo') }}</b> Password: <code>Demo@Insights2026</code></p>
+    <ul class="small">{% for u in demo_users %}<li><code>{{ u.email }}</code> · {{ ROLES[u.role] }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

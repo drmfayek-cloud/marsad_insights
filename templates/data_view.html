@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}#{{ up.id }}{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>#{{ up.id }} · {{ up.kind }} · {{ pick(KINDS[up.kind], KINDS_AR[up.kind]) }}</h1>
+  <div class="sub">{{ up.filename }} · {{ up.created_at[:16] }} · {{ up.created_by }} · <span class="badge {{ 'ok' if up.status == 'published' else 'warn' }}">{{ up.status }}</span>{% if is_current %} · {{ pick('current version', 'النسخة الحالية') }}{% endif %}</div></div></div>
+<div class="grid">
+<div class="card wide">
+  <h3>{{ pick('What was read', 'ما تمت قراءته') }}</h3>
+  <table class="t"><tbody>{% for k, v in summary.items() %}<tr><th>{{ k }}</th><td>{{ v }}</td></tr>{% endfor %}</tbody></table>
+</div>
+<div class="card wide">
+  <h3>{{ pick('Checks', 'التحقق') }}</h3>
+  {% if warnings %}<ul class="warnings">{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+  {% else %}<p class="muted">{{ pick('No issues found.', 'لا توجد ملاحظات.') }}</p>{% endif %}
+  <p class="small muted">{{ pick('Patient identifiers, staff names and free-text columns were not stored; references are hashed.',
+                                 'لم تحفظ معرفات المرضى أو أسماء الموظفين أو النصوص الحرة، وجرى ترميز المراجع.') }}</p>
+</div>
+</div>
+<form method="post" class="actions">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  {% if up.status in ('staged', 'superseded') %}<button class="btn primary" name="act" value="publish">{{ pick('Publish this version' if up.status == 'staged' else 'Roll back to this version', 'نشر هذه النسخة' if up.status == 'staged' else 'الرجوع إلى هذه النسخة') }}</button>{% endif %}
+  {% if up.status == 'staged' %}<button class="btn" name="act" value="discard">{{ pick('Discard', 'استبعاد') }}</button>{% endif %}
+  <a class="btn" href="{{ url_for('data_page') }}">{{ pick('Back', 'رجوع') }}</a>
+</form>
+{% endblock %}

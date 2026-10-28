@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block auth %}
+<div class="authcard">
+  <h1>{{ pick('Set up two-step sign-in', 'إعداد التحقق بخطوتين') }}</h1>
+  <ol class="small">
+    <li>{{ pick('Open an authenticator app (Microsoft Authenticator, Google Authenticator) and choose "add account", then "enter a setup key".',
+              'افتح تطبيق المصادقة واختر إضافة حساب ثم إدخال مفتاح الإعداد.') }}</li>
+    <li>{{ pick('Account name: MARSAD Insights. Key (time-based):', 'اسم الحساب: MARSAD Insights. المفتاح (مبني على الوقت):') }}
+      <div class="secret">{{ secret }}</div></li>
+    <li>{{ pick('Enter the 6-digit code the app shows.', 'أدخل الرمز المكون من 6 أرقام الذي يظهره التطبيق.') }}</li>
+  </ol>
+  <details class="small"><summary>{{ pick('Setup link (for apps that accept it)', 'رابط الإعداد') }}</summary><code class="wrap">{{ uri }}</code></details>
+  <form method="post">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <label>{{ t('code') }}<input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required></label>
+    <button class="btn primary">{{ pick('Confirm and sign in', 'تأكيد وتسجيل الدخول') }}</button>
+  </form>
+</div>
+{% endblock %}

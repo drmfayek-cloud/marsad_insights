@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block auth %}
+<div class="authcard">
+  <h1>{{ t('code') }}</h1>
+  <p class="muted">{{ pick('Enter the 6-digit code from your authenticator app.', 'أدخل الرمز المكون من 6 أرقام من تطبيق المصادقة.') }}</p>
+  <form method="post">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <label>{{ t('code') }}<input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required autofocus></label>
+    <button class="btn primary">{{ t('sign_in') }}</button>
+  </form>
+</div>
+{% endblock %}

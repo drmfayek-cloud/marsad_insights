@@ -1,0 +1,20 @@
+# Render Blueprint: PREVIEW ONLY, synthetic demo data (MARSAD_DEMO=1). Do not upload CNHI workbooks here:
+# the region is Frankfurt and the Free plan has no persistent disk (data resets on restart). See DEPLOY.md.
+services:
+  - type: web
+    name: marsad-insights-demo
+    runtime: docker
+    region: frankfurt
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: MARSAD_DEMO
+        value: "1"
+      - key: MARSAD_HTTPS
+        value: "1"
+      - key: MARSAD_SECRET_KEY
+        generateValue: true
+      - key: MARSAD_HASH_KEY
+        generateValue: true

@@ -1,0 +1,36 @@
+# MARSAD Insights - settings you may edit. Restart the service after a change.
+
+# TPA name variants found in the workbooks -> the one name shown on the dashboard (match is case-insensitive).
+# Add a line when a new spelling appears in an upload warning.
+tpa_names:
+  globemed: GlobeMed Saudi
+  globemed saudi: GlobeMed Saudi
+  nextcare: NextCare
+  next care: NextCare
+  tcs: TCS
+  totalcare: Totalcare
+
+# Flag families of the daily register (prefix of the flag code)
+flag_families:
+  ELG: {en: Eligibility, ar: الأهلية}
+  EMG: {en: Emergency qualification, ar: استحقاق الطوارئ}
+  TRG: {en: Triage integrity, ar: سلامة الفرز}
+  PRV: {en: Provider and channel, ar: مقدم الخدمة وقناة التقديم}
+  BEN: {en: Benefit and duration, ar: المنفعة والمدة}
+  TAT: {en: Turnaround, ar: زمن الإنجاز}
+  DOC: {en: Documentation, ar: التوثيق}
+  CLM: {en: Claims, ar: المطالبات}
+  DQ: {en: Data quality, ar: جودة البيانات}
+
+# Working week (Decision D-07): Sunday to Thursday. Python weekday numbers: Monday=0 ... Sunday=6.
+weekend_days: [4, 5]
+
+# Outlier rule for DR-05 (Selection reason column in the daily register)
+outlier_threshold_sar: 50000
+outlier_keyword: outlier
+
+# GSS checkpoints treated as critical (from the GSS Assurance Workbook Checklist Guide)
+gss_critical: [K1, K2, K3, K4]
+
+# Dispute ageing bands for HD-02 (days since receipt)
+dispute_age_bands: [5, 10, 20]

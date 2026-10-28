@@ -1,0 +1,1149 @@
+# KPI dictionary v0.3 (28 October 2026) - generated from CNHI_Dashboard_KPI_Dictionary_v0.3.xlsx.
+# Edit wording here; the dashboard reads names, definitions and caveats from this file. Calculations live in insights/kpi.py.
+version: '0.3'
+pages:
+- code: EX
+  slug: executive
+  en: Executive overview
+  ar: النظرة التنفيذية
+- code: DR
+  slug: daily-review
+  en: MARSAD daily review
+  ar: المراجعة اليومية - مرصد
+- code: HD
+  slug: disputes
+  en: Hospital disputes
+  ar: اعتراضات المستشفيات
+- code: GS
+  slug: gss
+  en: GSS assurance
+  ar: ضمان GSS
+- code: FR
+  slug: financial
+  en: Financial review
+  ar: المراجعة المالية
+- code: FW
+  slug: fwa
+  en: FWA, trends & root causes
+  ar: الاحتيال والهدر والأسباب الجذرية
+- code: GV
+  slug: governance
+  en: Governance & deliverables
+  ar: الحوكمة والمخرجات
+kpis:
+- id: EX-01
+  page: EX
+  tier: 1
+  placement: CFO page - headline tile
+  name_en: Encounters reviewed
+  name_ar: الحالات المراجعة
+  def_en: Number of pre-authorization encounters the team reviewed in the period, as recorded in the daily intake (claims added once in daily
+    scope).
+  def_ar: عدد حالات الموافقة المسبقة التي راجعها الفريق خلال الفترة وفق سجل الاستلام اليومي، وتضاف المطالبات عند دخولها نطاق المراجعة اليومية.
+  formula: 'SUM(Daily Intake: Reviewed)'
+  unit: Count
+  date_basis: Intake date
+  counting_unit: Encounter
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'Daily Intake (header row 4): A Date received, D TPA, F Reviewed'
+  status: Mapped
+  refresh: Daily
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Counts encounters screened against the flag rules. TPA name variants are normalised at upload through a mapping table.
+  decisions: D-01, D-02, D-18
+- id: EX-02
+  page: EX
+  tier: 1
+  placement: CFO page - secondary row
+  name_en: Review coverage
+  name_ar: نسبة تغطية المراجعة
+  def_en: Encounters reviewed as a share of encounters received.
+  def_ar: نسبة الحالات المراجعة إلى إجمالي الحالات المستلمة.
+  formula: 'SUM(Daily Intake: Reviewed) / SUM(Daily Intake: Volume received)'
+  unit: '%'
+  date_basis: Intake date
+  counting_unit: Encounter
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'Daily Intake: E Volume received, F Reviewed (H Coverage %)'
+  status: Mapped
+  refresh: Daily
+  owner: KPMG medical review lead
+  target: 100%
+  caveat: 'Replaces capacity utilisation on the CFO page (D-18): the register counts screened encounters (568 a day in September), so a 100-a-day
+    capacity would read as 500%+ utilisation.'
+  decisions: D-10, D-18
+- id: EX-03
+  page: EX
+  tier: 1
+  placement: CFO page - headline tile
+  name_en: Finding rate
+  name_ar: نسبة الحالات ذات الملاحظات
+  def_en: Share of reviewed encounters with at least one confirmed flag.
+  def_ar: نسبة الحالات المراجعة التي سجل الفريق عليها ملاحظة مؤكدة واحدة على الأقل.
+  formula: COUNT(distinct Reference no. with Flag status = Confirmed) / EX-01
+  unit: '%'
+  date_basis: Date logged
+  counting_unit: Encounter
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'Daily Log (header row 4): E Reference no., K Flag status, B Date logged; Daily Intake: F Reviewed'
+  status: Mapped
+  refresh: Daily
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: A reference with several flags counts once. Encounters are screened against risk rules, so this is not an error rate for all approvals.
+    October 2026 to date reads 0.8% against 6.6% in September, which points to flags not yet logged; check before publishing.
+  decisions: D-02, D-08
+- id: EX-04
+  page: EX
+  tier: 1
+  placement: CFO page - headline tile
+  name_en: Value at issue - pre-authorization
+  name_ar: القيمة محل الملاحظة - الموافقات المسبقة
+  def_en: SAR amount at risk on pre-authorization encounters with at least one confirmed flag.
+  def_ar: القيمة بالريال المعرضة للمخاطر في حالات الموافقة المسبقة التي تحمل ملاحظة مؤكدة واحدة على الأقل.
+  formula: SUM over distinct references of MAX(Amount at risk) where Flag status = Confirmed
+  unit: SAR
+  date_basis: Date logged
+  counting_unit: Encounter
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'Daily Log: E Reference no., K Flag status, N Amount at risk (SAR), B Date logged'
+  status: Mapped
+  refresh: Daily
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: 'Amount at risk is the estimated or approved value of the flagged encounter, not a computed disallowance. Counted once per reference
+    (D-19): summing every flag overstates the value by about 10% (SAR 105.5M vs 95.6M, Sep-Oct 2026). Potential cost avoidance at the Identified
+    stage.'
+  decisions: D-03, D-04, D-05, D-19
+- id: EX-05
+  page: EX
+  tier: 1
+  placement: CFO page - headline tile
+  name_en: Value at issue - claims
+  name_ar: القيمة محل الملاحظة - المطالبات
+  def_en: SAR value at issue on claims reviewed through GSS pre-payment assurance; daily claims review is added once in scope.
+  def_ar: القيمة بالريال محل الملاحظة في المطالبات المراجعة ضمن ضمان GSS قبل الصرف، وتضاف قيمة المراجعة اليومية للمطالبات عند دخولها النطاق.
+  formula: GS-05 (+ daily claims value at issue when available, overlapping claims counted once)
+  unit: SAR
+  date_basis: Review date
+  counting_unit: Claim
+  source: F2 MARSAD GSS Assurance Workbook (.xlsm)
+  source_columns: 'GSS workbook - Sample Register: Y Amount at issue (see GS-05)'
+  status: Mapped
+  refresh: Daily
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: The daily register holds pre-authorization flags only today (D-20). Identified stage; recovery is not confirmed.
+  decisions: D-03, D-04, D-17, D-20
+- id: EX-06
+  page: EX
+  tier: 1
+  placement: CFO page - headline tile
+  name_en: Findings sent to TPAs
+  name_ar: الملاحظات المرسلة إلى شركات إدارة المطالبات
+  def_en: Number and SAR amount at risk of confirmed flags routed to TPAs in the period.
+  def_ar: عدد الملاحظات المؤكدة المحالة إلى شركات إدارة المطالبات خلال الفترة وقيمتها المعرضة للمخاطر بالريال.
+  formula: COUNT and SUM(amount, once per reference) of confirmed flags with Action level = TPA level and a shared-with-TPA date in period
+  unit: Count / SAR
+  date_basis: Shared-with-TPA date
+  counting_unit: Finding
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'Daily Log: M Action level, K Flag status, N Amount at risk; new column ''Shared with TPA on'''
+  status: Needs new column
+  refresh: Daily
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Action level identifies TPA-level flags today; the date each flag is shared with the TPA (through the Share sheets) needs its own column.
+    Responses and recoveries are not captured yet.
+  decisions: D-03, D-09
+- id: EX-07
+  page: EX
+  tier: 1
+  placement: CFO page - headline tile
+  name_en: Hospital disputes closed
+  name_ar: اعتراضات المستشفيات المغلقة
+  def_en: Number of hospital disputes the team closed with a documented response in the period.
+  def_ar: عدد اعتراضات المستشفيات التي أغلقها الفريق برد موثق خلال الفترة.
+  formula: COUNT(disputes with closure date in period)
+  unit: Count
+  date_basis: Dispute closure date
+  counting_unit: Dispute
+  source: F3 Hospital disputes tracker (template v0.1, placeholder)
+  source_columns: 'Disputes: Closure date, Status'
+  status: Needs new source
+  refresh: Weekly
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Additional workload outside the daily review scope. The tile carries dispute effort in hours (HD-07) as a sub-line.
+  decisions: D-06, D-15
+- id: EX-08
+  page: EX
+  tier: 1
+  placement: CFO page - secondary row
+  name_en: Review position maintained in disputes
+  name_ar: نسبة ثبات موقف المراجعة في الاعتراضات
+  def_en: Share of closed disputes in which the original review position was fully maintained.
+  def_ar: نسبة الاعتراضات المغلقة التي ثبت فيها موقف المراجعة الأصلي بالكامل.
+  formula: Closed disputes with outcome = Maintained / EX-07
+  unit: '%'
+  date_basis: Dispute closure date
+  counting_unit: Dispute
+  source: F3 Hospital disputes tracker (template v0.1, placeholder)
+  source_columns: 'Disputes: Outcome, Closure date'
+  status: Needs new source
+  refresh: Weekly
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Supports evidence of review quality. Partial outcomes are shown in HD-04.
+  decisions: D-06, D-10
+- id: EX-09
+  page: EX
+  tier: 1
+  placement: CFO page - secondary row
+  name_en: GSS assurance reports issued
+  name_ar: تقارير ضمان GSS الصادرة
+  def_en: Number of GSS for which the team issued an assurance report in the period, and the claimed value they cover.
+  def_ar: عدد ملفات GSS التي أصدر الفريق تقرير ضمان عنها خلال الفترة، والقيمة المطالب بها التي تغطيها.
+  formula: COUNT(GSS with report issued date in period); SUM(claimed SAR) of those GSS
+  unit: Count / SAR
+  date_basis: Report issued date
+  counting_unit: GSS
+  source: F2 MARSAD GSS Assurance Workbook (.xlsm)
+  source_columns: 'GSS Register: T Status, AK Report issued date, M Claimed (SAR)'
+  status: Mapped
+  refresh: Per GSS
+  owner: KPMG GSS assurance lead
+  target: '-'
+  caveat: Shown with the share of issued reports rated Unsatisfactory (GS-01). Claimed value covered is not value at issue.
+  decisions: D-10, D-13
+- id: EX-10
+  page: EX
+  tier: 1
+  placement: CFO page - headline tile
+  name_en: Deliverables submitted on time
+  name_ar: نسبة المخرجات المسلمة في موعدها
+  def_en: Share of contractual deliverables due in the period that were submitted on or before the due date.
+  def_ar: نسبة المخرجات التعاقدية المستحقة خلال الفترة التي سلمها الفريق في موعدها أو قبله.
+  formula: Deliverables submitted on or before due date / deliverables due
+  unit: '%'
+  date_basis: Due date
+  counting_unit: Deliverable
+  source: F5 Governance register (new)
+  source_columns: ''
+  status: Needs new source
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: 100%
+  caveat: Counts submission, not CNHI approval (see GV-02).
+  decisions: D-10
+- id: DR-01
+  page: DR
+  tier: 2
+  placement: Page
+  name_en: Daily review throughput
+  name_ar: الإنتاجية اليومية للمراجعة
+  def_en: Cases reviewed per working day, shown as a daily trend.
+  def_ar: عدد الحالات المراجعة في كل يوم عمل، معروضا كاتجاه يومي.
+  formula: 'SUM(Daily Intake: Reviewed) per intake day; per reviewer from the Daily Review Log'
+  unit: Count per day
+  date_basis: Intake date
+  counting_unit: Encounter
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'Daily Intake: A Date received, F Reviewed; Daily Review Log: A Date, E Records reviewed'
+  status: Mapped
+  refresh: Daily
+  owner: KPMG medical review lead
+  target: To set after D-18
+  caveat: Non-working days excluded from the trend.
+  decisions: D-18
+- id: DR-02
+  page: DR
+  tier: 2
+  placement: Page
+  name_en: Review backlog
+  name_ar: الحالات المتراكمة قيد المراجعة
+  def_en: Encounters received and not yet reviewed at period end, per the daily intake.
+  def_ar: الحالات المستلمة التي لم تكتمل مراجعتها بنهاية الفترة وفق سجل الاستلام اليومي.
+  formula: 'SUM(Daily Intake: Outstanding) at period end'
+  unit: Count
+  date_basis: Intake date
+  counting_unit: Encounter
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'Daily Intake: G Outstanding'
+  status: Mapped
+  refresh: Daily
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Intake is recorded per day, source and TPA.
+  decisions: D-01
+- id: DR-03
+  page: DR
+  tier: 2
+  placement: Page
+  name_en: Review turnaround
+  name_ar: مدة إنجاز المراجعة
+  def_en: Median working days from receipt of a case to completion of its review.
+  def_ar: الوسيط لعدد أيام العمل من استلام الحالة حتى إنجاز مراجعتها.
+  formula: MEDIAN(review completion date - received date), in working days
+  unit: Days
+  date_basis: Review completion date
+  counting_unit: Case
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'New columns: received and reviewed timestamps per encounter'
+  status: Needs new column
+  refresh: Daily
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: The daily intake is aggregated per day; turnaround needs received and reviewed timestamps per encounter.
+  decisions: D-01
+- id: DR-04
+  page: DR
+  tier: 2
+  placement: Page
+  name_en: Findings by flag family
+  name_ar: الملاحظات حسب عائلة الملاحظة
+  def_en: Number and SAR amount at risk of confirmed flags by flag family (eligibility, emergency qualification, triage, benefit and duration,
+    documentation, provider and channel, data quality, claims, turnaround).
+  def_ar: عدد الملاحظات المؤكدة وقيمتها المعرضة للمخاطر بالريال حسب عائلة الملاحظة، مثل الأهلية واستحقاق الطوارئ وسلامة الفرز والمنفعة والمدة
+    والتوثيق ومقدم الخدمة وقناة التقديم وجودة البيانات والمطالبات وزمن الإنجاز.
+  formula: COUNT and SUM(amount at risk) of confirmed flags grouped by flag family (prefix of Flag code)
+  unit: Count / SAR
+  date_basis: Date logged
+  counting_unit: Flag
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'Daily Log: H Flag code (family = prefix), K Flag status, N Amount at risk; Config: A Flag code, B-C Flag type EN/AR'
+  status: Mapped
+  refresh: Daily
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: The daily register uses its own 35 flag codes in 9 families (DIM-22); GSS uses the MARSAD finding categories (DIM-05).
+  decisions: D-02
+- id: DR-05
+  page: DR
+  tier: 2
+  placement: Page
+  name_en: Outlier cases below SAR 50k
+  name_ar: الحالات الشاذة دون 50 ألف ريال
+  def_en: Number of cases below SAR 50,000 selected for review because they were outliers, and their finding rate.
+  def_ar: عدد الحالات التي تقل قيمتها عن 50 ألف ريال واختارها الفريق للمراجعة لأنها حالات شاذة، ونسبة الملاحظات عليها.
+  formula: COUNT(cases with selection reason = outlier below SAR 50k); finding rate as in EX-03
+  unit: Count / %
+  date_basis: Review completion date
+  counting_unit: Case
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'New column in Daily Log: ''Selection reason'''
+  status: Needs new column
+  refresh: Daily
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Policy applies from October 2026; earlier months show none by design.
+  decisions: D-08
+- id: DR-06
+  page: DR
+  tier: 3
+  placement: Drill-down
+  name_en: Value at issue per reviewed case
+  name_ar: القيمة محل الملاحظة لكل حالة مراجعة
+  def_en: 'Average SAR value at issue per case reviewed: the yield of the review effort.'
+  def_ar: متوسط القيمة محل الملاحظة لكل حالة مراجعة، ويعبر عن عائد جهد المراجعة.
+  formula: EX-04 / EX-01 (pre-authorization); GS-05 / GSS claims reviewed (claims)
+  unit: SAR
+  date_basis: Review completion date
+  counting_unit: Case
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: Derived from EX-04, EX-01, GS-05
+  status: Mapped
+  refresh: Daily
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Show by pathway; never add pre-authorization and claims values into one headline.
+  decisions: D-04
+- id: DR-07
+  page: DR
+  tier: 3
+  placement: Drill-down
+  name_en: Provider concentration
+  name_ar: تركز الملاحظات لدى مقدمي الخدمة
+  def_en: Share of total value at issue attributable to the ten providers with the highest value at issue.
+  def_ar: حصة أعلى عشرة مقدمي خدمة من إجمالي القيمة محل الملاحظة.
+  formula: SUM(value at issue, top 10 providers) / SUM(value at issue, all providers)
+  unit: '%'
+  date_basis: Date logged
+  counting_unit: Finding
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'Daily Log: G Provider, N Amount at risk, E Reference no.'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: High concentration supports targeted provider engagement. Provider names appear on management pages only.
+  decisions: D-12
+- id: DR-08
+  page: DR
+  tier: 2
+  placement: Page
+  name_en: Evidence traceability
+  name_ar: اكتمال التوثيق والأدلة
+  def_en: Share of findings in the register with a recorded evidence reference (document, page or rule).
+  def_ar: نسبة الملاحظات المسجلة في السجل التي تتضمن مرجعا موثقا للدليل، مثل المستند أو الصفحة أو القاعدة.
+  formula: Findings with evidence reference / all findings
+  unit: '%'
+  date_basis: Review completion date
+  counting_unit: Finding
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'New column in Daily Log: ''Evidence reference'''
+  status: Needs new column
+  refresh: Daily
+  owner: KPMG engagement manager
+  target: 100%
+  caveat: Flag description holds the rule text, not the evidence reference; add an 'Evidence reference' column to the Daily Log.
+  decisions: ''
+- id: HD-01
+  page: HD
+  tier: 2
+  placement: Page
+  name_en: Disputes received
+  name_ar: الاعتراضات الواردة
+  def_en: Number of disputes received from hospitals in the period.
+  def_ar: عدد الاعتراضات الواردة من المستشفيات خلال الفترة.
+  formula: COUNT(disputes with received date in period)
+  unit: Count
+  date_basis: Dispute received date
+  counting_unit: Dispute
+  source: F3 Hospital disputes tracker (template v0.1, placeholder)
+  source_columns: 'Disputes: Received date'
+  status: Needs new source
+  refresh: Weekly
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Closed disputes are reported in EX-07; outcomes in HD-04.
+  decisions: D-06
+- id: HD-02
+  page: HD
+  tier: 2
+  placement: Page
+  name_en: Open disputes and ageing
+  name_ar: الاعتراضات المفتوحة وأعمارها
+  def_en: Disputes not yet closed at period end, grouped by days since receipt (0-5, 6-10, 11-20, over 20).
+  def_ar: الاعتراضات غير المغلقة بنهاية الفترة، موزعة حسب عدد الأيام منذ استلامها (0-5، 6-10، 11-20، أكثر من 20).
+  formula: COUNT(open disputes) by age band at period end
+  unit: Count
+  date_basis: Dispute received date
+  counting_unit: Dispute
+  source: F3 Hospital disputes tracker (template v0.1, placeholder)
+  source_columns: 'Disputes: Received date, Status'
+  status: Needs new source
+  refresh: Weekly
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Age bands to align with any agreed response standard.
+  decisions: ''
+- id: HD-03
+  page: HD
+  tier: 2
+  placement: Page
+  name_en: Value disputed
+  name_ar: القيمة محل الاعتراض
+  def_en: SAR value of findings that hospitals disputed in the period.
+  def_ar: القيمة بالريال للملاحظات التي اعترضت عليها المستشفيات خلال الفترة.
+  formula: SUM(value of disputed findings) by received date
+  unit: SAR
+  date_basis: Dispute received date
+  counting_unit: Dispute
+  source: F3 Hospital disputes tracker (template v0.1, placeholder)
+  source_columns: 'Disputes: Value disputed (SAR)'
+  status: Needs new source
+  refresh: Weekly
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Value as stated in the original finding, not the hospital's claim.
+  decisions: D-05
+- id: HD-04
+  page: HD
+  tier: 2
+  placement: Page
+  name_en: Dispute outcome mix
+  name_ar: توزيع نتائج الاعتراضات
+  def_en: Closed disputes by outcome (maintained, partially maintained, reversed, withdrawn), by count and value.
+  def_ar: 'توزيع الاعتراضات المغلقة حسب النتيجة: ثبات الموقف، أو ثبات جزئي، أو إلغاء الملاحظة، أو سحب الاعتراض، عددا وقيمة.'
+  formula: COUNT and SUM(value) of closed disputes grouped by outcome
+  unit: Count / SAR
+  date_basis: Dispute closure date
+  counting_unit: Dispute
+  source: F3 Hospital disputes tracker (template v0.1, placeholder)
+  source_columns: 'Disputes: Outcome, Value disputed'
+  status: Needs new source
+  refresh: Weekly
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Outcome categories to fix in D-06.
+  decisions: D-06
+- id: HD-05
+  page: HD
+  tier: 2
+  placement: Page
+  name_en: Value defended
+  name_ar: القيمة المحافظ عليها بعد الاعتراض
+  def_en: SAR value of disputed findings that remained valid after the team's response.
+  def_ar: القيمة بالريال للملاحظات محل الاعتراض التي حافظت على صحتها بعد رد الفريق.
+  formula: SUM(value, outcome = Maintained) + SUM(maintained portion, outcome = Partially maintained)
+  unit: SAR
+  date_basis: Dispute closure date
+  counting_unit: Dispute
+  source: F3 Hospital disputes tracker (template v0.1, placeholder)
+  source_columns: 'Disputes: Value maintained (SAR), Outcome'
+  status: Needs new source
+  refresh: Weekly
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Defended value is not recovered cash.
+  decisions: D-03, D-06
+- id: HD-06
+  page: HD
+  tier: 2
+  placement: Page
+  name_en: Dispute response turnaround
+  name_ar: مدة الرد على الاعتراضات
+  def_en: Median working days from receipt of a dispute to the team's documented response.
+  def_ar: الوسيط لعدد أيام العمل من استلام الاعتراض حتى رد الفريق الموثق.
+  formula: MEDIAN(response date - received date), in working days
+  unit: Days
+  date_basis: Dispute response date
+  counting_unit: Dispute
+  source: F3 Hospital disputes tracker (template v0.1, placeholder)
+  source_columns: 'Disputes: Received date, Response date'
+  status: Needs new source
+  refresh: Weekly
+  owner: KPMG medical review lead
+  target: Response standard to confirm with CNHI
+  caveat: ''
+  decisions: ''
+- id: HD-07
+  page: HD
+  tier: 2
+  placement: Page + sub-line on EX-07 tile
+  name_en: Effort on hospital disputes
+  name_ar: الجهد المبذول في معالجة الاعتراضات
+  def_en: Person-hours the team spent on hospital disputes in the period, and their share of total team hours.
+  def_ar: ساعات العمل التي خصصها الفريق لمعالجة اعتراضات المستشفيات خلال الفترة، ونسبتها من إجمالي ساعات الفريق.
+  formula: SUM(dispute hours); SUM(dispute hours) / SUM(team hours)
+  unit: Hours / %
+  date_basis: Work date
+  counting_unit: Hour
+  source: F3 Hospital disputes tracker (template v0.1, placeholder)
+  source_columns: 'Time Log: Date, Hours, Dispute ID / activity'
+  status: Needs new source
+  refresh: Weekly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Visible to CNHI (D-15). Logged in the tracker's Time Log from October 2026.
+  decisions: D-15
+- id: GS-01
+  page: GS
+  tier: 2
+  placement: Page
+  name_en: Assurance opinion mix
+  name_ar: توزيع آراء الضمان
+  def_en: Issued GSS assurance reports by opinion (Satisfactory, Satisfactory with exceptions, Unsatisfactory), by count and claimed value.
+  def_ar: توزيع تقارير ضمان GSS الصادرة حسب الرأي (مرض، أو مرض مع استثناءات، أو غير مرض)، عددا وقيمة مطالبا بها.
+  formula: COUNT and SUM(claimed SAR) of issued GSS grouped by opinion
+  unit: Count / SAR
+  date_basis: Report issued date
+  counting_unit: GSS
+  source: F2 MARSAD GSS Assurance Workbook (.xlsm)
+  source_columns: 'GSS Register: BA Assurance opinion, AK Report issued date, M Claimed (SAR)'
+  status: Mapped
+  refresh: Per GSS
+  owner: KPMG GSS assurance lead
+  target: '-'
+  caveat: 'Opinion rules come from the workbook: Satisfactory at most 5% of sampled claims flagged; Unsatisfactory above 20% or any critical checkpoint
+    failed. ''Review incomplete'' is excluded.'
+  decisions: D-08
+- id: GS-02
+  page: GS
+  tier: 2
+  placement: Page
+  name_en: GSS awaiting review
+  name_ar: ملفات GSS بانتظار المراجعة
+  def_en: GSS in the CNHI clearance queue not yet reported on, by stage (not registered, sampling, under review), with their claimed value.
+  def_ar: ملفات GSS في قائمة التصفية لدى المركز التي لم يصدر الفريق تقريرها بعد، حسب المرحلة (غير مسجلة، أو سحب العينة، أو قيد المراجعة)، مع قيمتها
+    المطالب بها.
+  formula: COUNT and SUM(claimed SAR) of GSS with status Not registered, Sampling or Under review at period end
+  unit: Count / SAR
+  date_basis: As-of date
+  counting_unit: GSS
+  source: F2 MARSAD GSS Assurance Workbook (.xlsm)
+  source_columns: 'Priority Queue: AB Review status, S Claimed (SAR); GSS Register: T Status'
+  status: Mapped
+  refresh: Per load
+  owner: KPMG GSS assurance lead
+  target: '-'
+  caveat: Queue figures depend on the latest CNHI Claims Batch loaded into the workbook.
+  decisions: ''
+- id: GS-03
+  page: GS
+  tier: 2
+  placement: Page
+  name_en: Sample coverage
+  name_ar: تغطية العينة
+  def_en: Sampled claims as a share of claims in the GSS, and sample value as a share of claimed value, for issued reports.
+  def_ar: نسبة المطالبات المسحوبة في العينة إلى إجمالي مطالبات ملف GSS، ونسبة قيمة العينة إلى القيمة المطالب بها، للتقارير الصادرة.
+  formula: SUM(sampled claims) / SUM(claims in GSS); SUM(sample value) / SUM(claimed SAR)
+  unit: '%'
+  date_basis: Report issued date
+  counting_unit: GSS
+  source: F2 MARSAD GSS Assurance Workbook (.xlsm)
+  source_columns: 'GSS Register: AM Sampled claims, L Claims in GSS, AN Sample value, M Claimed (SAR)'
+  status: Mapped
+  refresh: Per GSS
+  owner: KPMG GSS assurance lead
+  target: '-'
+  caveat: 'Value coverage is the more meaningful figure: mandatory selection targets high-value claims.'
+  decisions: ''
+- id: GS-04
+  page: GS
+  tier: 2
+  placement: Page
+  name_en: Claim flag rate in GSS samples
+  name_ar: نسبة المطالبات المرصودة في عينات GSS
+  def_en: Share of reviewed sampled claims that raised at least one flag.
+  def_ar: نسبة المطالبات المراجعة في العينة التي رصد الفريق عليها ملاحظة واحدة على الأقل.
+  formula: Claims flagged / claims reviewed (sampled claims)
+  unit: '%'
+  date_basis: Review date
+  counting_unit: Claim
+  source: F2 MARSAD GSS Assurance Workbook (.xlsm)
+  source_columns: 'GSS Register: AQ Claims reviewed, AR Claims flagged; Sample Register: AA Flag'
+  status: Mapped
+  refresh: Per GSS
+  owner: KPMG GSS assurance lead
+  target: '-'
+  caveat: Mandatory and risk-score selections raise the rate by design; it is not the provider's error rate across the GSS.
+  decisions: D-08
+- id: GS-05
+  page: GS
+  tier: 2
+  placement: Page
+  name_en: Amount at issue in GSS samples
+  name_ar: القيمة محل الملاحظة في عينات GSS
+  def_en: SAR value at issue on flagged sampled claims, by claim outcome and finding category.
+  def_ar: القيمة بالريال محل الملاحظة في مطالبات العينة المرصودة، حسب نتيجة المطالبة وفئة الملاحظة.
+  formula: SUM(amount at issue) of sampled claims
+  unit: SAR
+  date_basis: Review date
+  counting_unit: Claim
+  source: F2 MARSAD GSS Assurance Workbook (.xlsm)
+  source_columns: 'Sample Register: Y Amount at issue, U Outcome, V Finding category'
+  status: Mapped
+  refresh: Per GSS
+  owner: KPMG GSS assurance lead
+  target: '-'
+  caveat: Identified stage only. Some amounts cannot be quantified until CNHI supplies the contracted tariff. Reported separately from EX-05 (D-17).
+  decisions: D-03, D-05, D-17
+- id: GS-06
+  page: GS
+  tier: 2
+  placement: Page
+  name_en: Checklist exceptions
+  name_ar: استثناءات قائمة التحقق
+  def_en: Checkpoints K1 to K12 answered Fail or Partial across issued GSS, with critical fails shown separately.
+  def_ar: عدد نقاط التحقق من K1 إلى K12 التي جاءت نتيجتها إخفاقا أو اجتيازا جزئيا في ملفات GSS الصادرة، مع إبراز الإخفاقات الحرجة.
+  formula: COUNT(Fail), COUNT(Partial), COUNT(critical Fail) by checkpoint
+  unit: Count
+  date_basis: Report issued date
+  counting_unit: Checkpoint answer
+  source: F2 MARSAD GSS Assurance Workbook (.xlsm)
+  source_columns: 'GSS Register: U-AF K1-K12, AW Critical fails'
+  status: Mapped
+  refresh: Per GSS
+  owner: KPMG GSS assurance lead
+  target: '-'
+  caveat: 'Critical checkpoints: K1 reconciliation, K2 TPA audit, K3 adjudication totals, K4 duplicates and overlaps.'
+  decisions: ''
+- id: GS-07
+  page: GS
+  tier: 2
+  placement: Page
+  name_en: Open and overdue GSS flags
+  name_ar: ملاحظات GSS المفتوحة والمتأخرة
+  def_en: Claim flags not yet closed at period end and those past their due date, by owner and severity.
+  def_ar: ملاحظات المطالبات غير المغلقة بنهاية الفترة والمتجاوزة لموعدها المحدد، حسب الجهة المسؤولة ودرجة الخطورة.
+  formula: COUNT(flag status Open or In progress); COUNT(of those with due date before as-of date)
+  unit: Count
+  date_basis: As-of date
+  counting_unit: Claim flag
+  source: F2 MARSAD GSS Assurance Workbook (.xlsm)
+  source_columns: 'Sample Register: AE Flag status, AD Due date, AC Flag owner, AB Flag severity'
+  status: Mapped
+  refresh: Per load
+  owner: KPMG GSS assurance lead
+  target: '-'
+  caveat: Most open flags sit with providers and TPAs; present as follow-up status, not team backlog.
+  decisions: ''
+- id: GS-08
+  page: GS
+  tier: 3
+  placement: Drill-down
+  name_en: GSS report turnaround
+  name_ar: مدة إصدار تقرير GSS
+  def_en: Median days from review start to issue of the GSS assurance report.
+  def_ar: الوسيط لعدد الأيام من بدء مراجعة ملف GSS حتى إصدار تقرير الضمان.
+  formula: MEDIAN(report issued date - review start date)
+  unit: Days
+  date_basis: Report issued date
+  counting_unit: GSS
+  source: F2 MARSAD GSS Assurance Workbook (.xlsm)
+  source_columns: 'GSS Register: S Review start date, AK Report issued date'
+  status: Mapped
+  refresh: Per GSS
+  owner: KPMG GSS assurance lead
+  target: '-'
+  caveat: ''
+  decisions: ''
+- id: FR-01
+  page: FR
+  tier: 2
+  placement: Page
+  name_en: Claims value submitted and approved
+  name_ar: قيمة المطالبات المقدمة والمعتمدة
+  def_en: SAR value of claims submitted by TPAs and the value approved for the quarter, by referral type (inside or outside the Kingdom) and provider.
+  def_ar: القيمة بالريال للمطالبات المقدمة من شركات إدارة المطالبات والقيمة المعتمدة منها خلال الربع، حسب نوع الإحالة (داخل المملكة أو خارجها)
+    ومقدم الخدمة.
+  formula: SUM(Total Claimed Amount); SUM(Total Approved Amount)
+  unit: SAR
+  date_basis: Accounting quarter
+  counting_unit: Purchase order
+  source: F4 Quarterly accounting report (Q1 2026 workbook)
+  source_columns: 'Q1 claims sheet: A referral type, D hospital, J Total Claimed Amount, M Total Approved Amount'
+  status: Mapped
+  refresh: Quarterly
+  owner: KPMG financial review lead
+  target: '-'
+  caveat: Values include VAT as reported (D-05). Referrals outside the Kingdom are shown separately.
+  decisions: D-05, D-21
+- id: FR-02
+  page: FR
+  tier: 2
+  placement: Page
+  name_en: Adjudication reduction
+  name_ar: قيمة التخفيض عند الاعتماد
+  def_en: SAR difference between claimed and approved values, and its share of the claimed value.
+  def_ar: الفرق بالريال بين القيمة المطالب بها والقيمة المعتمدة، ونسبته من القيمة المطالب بها.
+  formula: Claimed - approved; (claimed - approved) / claimed
+  unit: SAR / %
+  date_basis: Accounting quarter
+  counting_unit: Purchase order
+  source: F4 Quarterly accounting report (Q1 2026 workbook)
+  source_columns: 'Q1 claims sheet: J Total Claimed Amount, M Total Approved Amount'
+  status: Mapped
+  refresh: Quarterly
+  owner: KPMG financial review lead
+  target: '-'
+  caveat: Reflects TPA adjudication, not KPMG findings; read alongside GSS checkpoint K8 (rejection pattern).
+  decisions: D-21
+- id: FR-03
+  page: FR
+  tier: 2
+  placement: Page
+  name_en: Duplicate payments deducted
+  name_ar: الحسميات على الدفعات المكررة
+  def_en: SAR deducted from payment orders for duplicate payments.
+  def_ar: القيمة بالريال المحسومة من أوامر الدفع بسبب الدفعات المكررة.
+  formula: Value reported on the duplicate-payment deductions line
+  unit: SAR
+  date_basis: Accounting quarter
+  counting_unit: Payment order
+  source: F4 Quarterly accounting report (Q1 2026 workbook)
+  source_columns: 'Carried-claims tracking sheet: duplicate-payment deductions row'
+  status: Mapped
+  refresh: Quarterly
+  owner: KPMG financial review lead
+  target: '-'
+  caveat: Reported as a single total; a provider breakdown needs the detail list.
+  decisions: D-21
+- id: FR-04
+  page: FR
+  tier: 2
+  placement: Page
+  name_en: Payment order coverage
+  name_ar: نسبة إصدار أوامر الدفع
+  def_en: Share of approved purchase-order value with a payment order issued, and the value still awaiting one.
+  def_ar: نسبة قيمة أوامر الشراء المعتمدة التي صدر لها أمر دفع، والقيمة التي لا تزال بانتظار أمر دفع.
+  formula: Payment orders incl. VAT / total approved; total approved - payment orders
+  unit: '% / SAR'
+  date_basis: Accounting quarter
+  counting_unit: Purchase order
+  source: F4 Quarterly accounting report (Q1 2026 workbook)
+  source_columns: 'Q1 report sheet (header row 8): J total approved, N payment orders incl. VAT, O value without payment order'
+  status: Mapped
+  refresh: Quarterly
+  owner: KPMG financial review lead
+  target: '-'
+  caveat: ''
+  decisions: D-21
+- id: FR-05
+  page: FR
+  tier: 2
+  placement: Page
+  name_en: Prior-year claims settled
+  name_ar: تسوية مطالبات العام السابق
+  def_en: Unpaid claims carried forward from the previous year, and the share with a payment order issued by quarter end.
+  def_ar: المطالبات غير المدفوعة المرحلة من العام السابق، ونسبة ما صدر له أمر دفع حتى نهاية الربع.
+  formula: Payment orders issued to quarter end / total unpaid prior-year claims
+  unit: SAR / %
+  date_basis: Quarter end
+  counting_unit: Claim category
+  source: F4 Quarterly accounting report (Q1 2026 workbook)
+  source_columns: 'Carried-claims tracking sheet: unpaid prior-year total, payment orders to quarter end'
+  status: Mapped
+  refresh: Quarterly
+  owner: KPMG financial review lead
+  target: '-'
+  caveat: Year labels roll forward each year.
+  decisions: D-21
+- id: FR-06
+  page: FR
+  tier: 2
+  placement: Page
+  name_en: Reconciliation exceptions
+  name_ar: استثناءات المطابقة
+  def_en: Number and SAR difference of exceptions found when reconciling claims-management records with the Etimad platform (provider name, purchase-order
+    number, amount).
+  def_ar: عدد الاستثناءات وفروقاتها بالريال عند مطابقة سجلات إدارة المطالبات مع منصة اعتماد، مثل اختلاف اسم مقدم الخدمة أو رقم أمر الشراء أو القيمة.
+  formula: COUNT(exceptions); SUM(difference)
+  unit: Count / SAR
+  date_basis: Accounting quarter
+  counting_unit: Exception
+  source: F4 Quarterly accounting report (Q1 2026 workbook)
+  source_columns: 'Input-notes sheet: A description, E payment order value, F claim value, G difference'
+  status: Mapped
+  refresh: Quarterly
+  owner: KPMG financial review lead
+  target: '-'
+  caveat: Exception type comes from a free-text description; standardise it to a short list.
+  decisions: D-21
+- id: FR-07
+  page: FR
+  tier: 2
+  placement: Page
+  name_en: Accrued claims not yet invoiced
+  name_ar: المطالبات المستحقة غير المفوترة
+  def_en: Approved GSS value for which no invoice had been received by quarter end.
+  def_ar: قيمة ملفات GSS المعتمدة التي لم تستلم فواتيرها حتى نهاية الربع.
+  formula: SUM(claims not received to quarter end)
+  unit: SAR
+  date_basis: Quarter end
+  counting_unit: GSS
+  source: F4 Quarterly accounting report (Q1 2026 workbook)
+  source_columns: 'Accrued-expenses sheet (header row 3): A GSS_ID, D STATUS, K TOTAL APPROVED, N claims not received'
+  status: Mapped
+  refresh: Quarterly
+  owner: KPMG financial review lead
+  target: '-'
+  caveat: Keyed by GSS ID, so it can be matched to GSS assurance reports.
+  decisions: D-21
+- id: FR-08
+  page: FR
+  tier: 2
+  placement: Page
+  name_en: Budget utilisation
+  name_ar: نسبة استخدام الميزانية
+  def_en: Payment orders charged to the treatment budget lines as a share of the budget for the period.
+  def_ar: أوامر الدفع المحملة على بنود العلاج في الميزانية منسوبة إلى ميزانية الفترة.
+  formula: Total spend / current allocation, by treatment line (inside and outside the Kingdom)
+  unit: '% / SAR'
+  date_basis: Accounting period
+  counting_unit: Budget line
+  source: F4 Quarterly accounting report (Q1 2026 workbook)
+  source_columns: 'Budget sheet: allocation table - line name, current allocation (الإعتماد الحالي), total (الجملة)'
+  status: Mapped
+  refresh: Quarterly
+  owner: KPMG financial review lead
+  target: '-'
+  caveat: Allocation and spend come from the budget sheet of the quarterly report (current allocation and total spend per treatment line).
+  decisions: D-16, D-21
+- id: FW-01
+  page: FW
+  tier: 2
+  placement: Page
+  name_en: FWA indicators triggered
+  name_ar: مؤشرات الاحتيال والهدر وإساءة الاستخدام المرصودة
+  def_en: Number of cases that triggered at least one predefined FWA rule, by rule.
+  def_ar: عدد الحالات التي استوفت قاعدة واحدة على الأقل من قواعد رصد الاحتيال والهدر وإساءة الاستخدام المعتمدة، موزعة حسب القاعدة.
+  formula: COUNT(distinct Reference no. per Flag code)
+  unit: Count
+  date_basis: Date logged
+  counting_unit: Case
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'Daily Log: H Flag code, E Reference no.'
+  status: Mapped
+  refresh: Daily
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Every flag in the daily register is rule-coded (35 codes).
+  decisions: ''
+- id: FW-02
+  page: FW
+  tier: 3
+  placement: Drill-down
+  name_en: Indicator validation rate
+  name_ar: نسبة تأكيد المؤشرات
+  def_en: Share of triggered indicators that the review confirmed as findings.
+  def_ar: نسبة المؤشرات المرصودة التي أكدتها المراجعة كملاحظات.
+  formula: Confirmed / (Confirmed + Cleared on review)
+  unit: '%'
+  date_basis: Date logged
+  counting_unit: Rule hit
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'Daily Log: K Flag status (Confirmed / Cleared on review)'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Used to tune rules. Cleared items count only when reviewers log them, so the rate (98% today) may be overstated.
+  decisions: ''
+- id: FW-03
+  page: FW
+  tier: 2
+  placement: Page
+  name_en: Findings by FWA level
+  name_ar: الملاحظات حسب مستوى الاحتيال والهدر وإساءة الاستخدام
+  def_en: Number and SAR value of findings classified as error, waste, abuse or suspected fraud.
+  def_ar: عدد الملاحظات وقيمتها بالريال مصنفة إلى خطأ أو هدر أو إساءة استخدام أو اشتباه احتيال.
+  formula: COUNT and SUM(value) of findings grouped by FWA level
+  unit: Count / SAR
+  date_basis: Review completion date
+  counting_unit: Finding
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'New: FWA level per flag code in Config'
+  status: Needs new column
+  refresh: Daily
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: 'Suspected fraud is an indicator for escalation, not a determination. Recommended: classify each of the 35 flag codes once in Config
+    (FWA level per code) rather than per row.'
+  decisions: ''
+- id: FW-04
+  page: FW
+  tier: 2
+  placement: Page
+  name_en: Escalations to CNHI
+  name_ar: حالات التصعيد إلى المركز
+  def_en: Number of confirmed flags escalated to CNHI for endorsement, and CNHI's responses.
+  def_ar: عدد الملاحظات المؤكدة التي صعدها الفريق إلى المركز لطلب التأييد، وردود المركز عليها.
+  formula: COUNT(flags with Sent to CNHI on in period) by CNHI response
+  unit: Count
+  date_basis: Sent-to-CNHI date
+  counting_unit: Flag
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'Daily Log: AW Sent to CNHI on, AZ CNHI response, BD CNHI status'
+  status: Mapped
+  refresh: Weekly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: The Escalation column flags overdue items for internal follow-up; it is not a controlled escalation and is not used. No case details
+    appear on the dashboard.
+  decisions: D-14
+- id: FW-05
+  page: FW
+  tier: 2
+  placement: Page
+  name_en: Value-stage funnel
+  name_ar: مراحل القيمة
+  def_en: 'Value at issue at each stage: identified, validated, endorsed by CNHI, sent to TPA, confirmed, recovered or avoided.'
+  def_ar: 'القيمة محل الملاحظة في كل مرحلة: محددة، ثم معتمدة داخليا، ثم مؤيدة من المركز، ثم مرسلة لشركة إدارة المطالبات، ثم مؤكدة، ثم مستردة أو
+    متجنبة.'
+  formula: SUM(value) of findings that reached each stage
+  unit: SAR
+  date_basis: Stage date
+  counting_unit: Finding
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'Daily Log: K, N (identified); AW (sent to CNHI); AZ (CNHI response); S Date closed (not yet populated)'
+  status: Not captured yet
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Identified and Sent to CNHI stages are available today; Status and Date closed are blank for most flags, so resolution stages show 'data
+    capture in progress'.
+  decisions: D-03, D-09
+- id: FW-06
+  page: FW
+  tier: 2
+  placement: Page
+  name_en: Root-cause distribution
+  name_ar: توزيع الأسباب الجذرية
+  def_en: Number and SAR value of findings by root cause.
+  def_ar: عدد الملاحظات وقيمتها بالريال موزعة حسب السبب الجذري.
+  formula: COUNT and SUM(value) of findings grouped by root cause
+  unit: Count / SAR
+  date_basis: Review completion date
+  counting_unit: Finding
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'New: root cause per flag code in Config, overridable per row'
+  status: Needs new column
+  refresh: Monthly
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: 'No root-cause column today. Recommended: a default root cause per flag code in Config, overridable per row.'
+  decisions: ''
+- id: FW-07
+  page: FW
+  tier: 3
+  placement: Drill-down
+  name_en: Repeat findings
+  name_ar: الملاحظات المتكررة
+  def_en: Share of findings where the same provider had a finding in the same review dimension in the previous three months.
+  def_ar: نسبة الملاحظات التي سبق رصد ملاحظة مماثلة لها لدى مقدم الخدمة نفسه وفي محور المراجعة نفسه خلال الأشهر الثلاثة السابقة.
+  formula: Flags where the same provider had a confirmed flag in the same family in the previous three months / all confirmed flags
+  unit: '%'
+  date_basis: Date logged
+  counting_unit: Finding
+  source: F1 MARSAD Daily Record & Action Tracker v5.6 (.xlsm)
+  source_columns: 'Daily Log: G Provider, H Flag code, B Date logged'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG medical review lead
+  target: '-'
+  caveat: Computed by the app from history; needs at least three months of loaded data.
+  decisions: D-12
+- id: FW-08
+  page: FW
+  tier: 2
+  placement: Page
+  name_en: Process-improvement recommendations
+  name_ar: توصيات تحسين الإجراءات
+  def_en: Recommendations raised, accepted by CNHI and implemented.
+  def_ar: عدد توصيات تحسين الإجراءات التي قدمها الفريق، وما اعتمده المركز منها، وما دخل حيز التنفيذ.
+  formula: 'COUNT(recommendations) by status: raised / accepted / implemented'
+  unit: Count
+  date_basis: Status date
+  counting_unit: Recommendation
+  source: F5 Governance register (new)
+  source_columns: ''
+  status: Needs new source
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: ''
+  decisions: ''
+- id: GV-01
+  page: GV
+  tier: 2
+  placement: Page
+  name_en: Deliverables submitted vs plan
+  name_ar: المخرجات المسلمة مقارنة بالخطة
+  def_en: Number of deliverables submitted against the plan, by type.
+  def_ar: عدد المخرجات المسلمة مقارنة بالخطة، حسب النوع.
+  formula: COUNT(submitted) vs COUNT(planned), by deliverable type
+  unit: Count
+  date_basis: Due date
+  counting_unit: Deliverable
+  source: F5 Governance register (new)
+  source_columns: ''
+  status: Needs new source
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: ''
+  decisions: ''
+- id: GV-02
+  page: GV
+  tier: 2
+  placement: Page
+  name_en: Deliverables approved by CNHI
+  name_ar: المخرجات المعتمدة من المركز
+  def_en: Number and share of submitted deliverables approved by CNHI.
+  def_ar: عدد المخرجات التي اعتمدها المركز ونسبتها من المخرجات المسلمة.
+  formula: COUNT(approved) / COUNT(submitted)
+  unit: Count / %
+  date_basis: Approval date
+  counting_unit: Deliverable
+  source: F5 Governance register (new)
+  source_columns: ''
+  status: Needs new source
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: ''
+  decisions: D-11
+- id: GV-03
+  page: GV
+  tier: 3
+  placement: Drill-down
+  name_en: CNHI approval turnaround
+  name_ar: مدة اعتماد المخرجات
+  def_en: Median days from submission of a deliverable to CNHI approval.
+  def_ar: الوسيط لعدد الأيام من تسليم المخرج حتى اعتماده من المركز.
+  formula: MEDIAN(approval date - submission date)
+  unit: Days
+  date_basis: Approval date
+  counting_unit: Deliverable
+  source: F5 Governance register (new)
+  source_columns: ''
+  status: Needs new source
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Depends on CNHI review cycles; present neutrally.
+  decisions: ''
+- id: GV-04
+  page: GV
+  tier: 2
+  placement: Page
+  name_en: QA sign-off before submission
+  name_ar: اعتماد الجودة قبل التسليم
+  def_en: Share of submitted deliverables with documented QA sign-off before submission.
+  def_ar: نسبة المخرجات المسلمة التي سبق تسليمها اعتماد موثق من مراجعة الجودة.
+  formula: Deliverables with QA date on or before submission date / deliverables submitted
+  unit: '%'
+  date_basis: Submission date
+  counting_unit: Deliverable
+  source: F5 Governance register (new)
+  source_columns: ''
+  status: Needs new source
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: 100%
+  caveat: ''
+  decisions: ''
+- id: GV-05
+  page: GV
+  tier: 2
+  placement: Page
+  name_en: Governance meetings held
+  name_ar: اجتماعات الحوكمة المنعقدة
+  def_en: Weekly project meetings and monthly management reviews held against plan.
+  def_ar: اجتماعات المشروع الأسبوعية ومراجعات الإدارة الشهرية المنعقدة مقارنة بالخطة.
+  formula: COUNT(held) / COUNT(planned), by meeting type
+  unit: Count / %
+  date_basis: Meeting date
+  counting_unit: Meeting
+  source: F5 Governance register (new)
+  source_columns: ''
+  status: Needs new source
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: 100%
+  caveat: ''
+  decisions: ''
+- id: GV-06
+  page: GV
+  tier: 2
+  placement: Page
+  name_en: Knowledge transfer progress
+  name_ar: تقدم نقل المعرفة
+  def_en: Knowledge-transfer sessions delivered and methodology documents handed over against plan.
+  def_ar: جلسات نقل المعرفة المنفذة ووثائق المنهجية المسلمة مقارنة بالخطة.
+  formula: COUNT(delivered) / COUNT(planned), by item type
+  unit: Count / %
+  date_basis: Delivery date
+  counting_unit: KT item
+  source: F5 Governance register (new)
+  source_columns: ''
+  status: Needs new source
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Supports CNHI's ability to sustain the methodology after the project.
+  decisions: ''

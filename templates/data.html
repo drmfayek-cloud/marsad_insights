@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ t('data') }}{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>{{ t('data') }}</h1>
+  <div class="sub">{{ pick('Upload a workbook, check the preview, then publish. The workbook itself is not kept: only de-identified figures are stored.',
+                           'حمل المصنف وراجع المعاينة ثم انشر. لا يحتفظ النظام بالمصنف نفسه، بل بالأرقام بعد إزالة الهوية فقط.') }}</div></div></div>
+<div class="grid">
+<div class="card wide">
+  <h3>{{ pick('Upload', 'تحميل') }}</h3>
+  <form method="post" enctype="multipart/form-data" class="uploadform">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <label>{{ pick('Workbook', 'المصنف') }}
+      <select name="kind" required>{% for k, v in KINDS.items() %}<option value="{{ k }}">{{ k }} · {{ pick(v, KINDS_AR[k]) }}</option>{% endfor %}</select></label>
+    <label>{{ pick('File (.xlsx or .xlsm, up to 40 MB)', 'الملف (.xlsx أو .xlsm حتى 40 ميغابايت)') }}<input type="file" name="file" accept=".xlsx,.xlsm" required></label>
+    <label>{{ pick('Quarter, accounting report only (e.g. 2026-Q1; read from the sheet names if blank)', 'الربع، للتقرير المحاسبي فقط') }}<input name="label" placeholder="2026-Q1" pattern="\d{4}-Q[1-4]"></label>
+    <button class="btn primary">{{ pick('Upload and preview', 'تحميل ومعاينة') }}</button>
+  </form>
+  <p class="small muted">{{ pick('Templates:', 'النماذج:') }} <a href="{{ url_for('governance_xlsx') }}">{{ pick('Governance register (F5)', 'سجل الحوكمة (F5)') }}</a> ·
+    <a href="{{ url_for('static', filename='downloads/CNHI_Hospital_Disputes_Tracker_v0.1.xlsx') }}">{{ pick('Hospital disputes tracker (F3)', 'سجل الاعتراضات (F3)') }}</a></p>
+</div>
+<div class="card wide">
+  <h3>{{ pick('Published versions', 'النسخ المنشورة') }}</h3>
+  <table class="t"><thead><tr><th>{{ pick('Workbook', 'المصنف') }}</th><th>{{ pick('Version', 'النسخة') }}</th><th>{{ pick('File', 'الملف') }}</th><th>{{ pick('Published', 'تاريخ النشر') }}</th></tr></thead><tbody>
+  {% for k, v in KINDS.items() %}{% set u = current.get(k) %}
+    <tr><td>{{ k }} · {{ pick(v, KINDS_AR[k]) }}</td>
+      {% if u %}<td><a href="{{ url_for('data_view', uid=u.id) }}">#{{ u.id }}</a></td><td>{{ u.filename }}{% if u.label %} ({{ u.label }}){% endif %}</td><td>{{ u.published_at[:16] }}</td>
+      {% else %}<td colspan="3" class="muted">{{ pick('Not published yet', 'لم ينشر بعد') }}</td>{% endif %}</tr>
+  {% endfor %}</tbody></table>
+</div>
+<div class="card wide">
+  <h3>{{ pick('Upload history', 'سجل التحميل') }}</h3>
+  <div class="tablewrap"><table class="t"><thead><tr><th>#</th><th>{{ pick('Workbook', 'المصنف') }}</th><th>{{ pick('File', 'الملف') }}</th><th>{{ pick('Status', 'الحالة') }}</th><th>{{ pick('Uploaded', 'التحميل') }}</th><th>{{ pick('By', 'بواسطة') }}</th></tr></thead><tbody>
+  {% for u in uploads %}<tr><td><a href="{{ url_for('data_view', uid=u.id) }}">#{{ u.id }}</a></td><td>{{ u.kind }}</td><td>{{ u.filename }}{% if u.label %} ({{ u.label }}){% endif %}</td>
+    <td><span class="badge {{ 'ok' if u.status == 'published' else 'warn' if u.status == 'staged' else '' }}">{{ u.status }}</span></td><td>{{ u.created_at[:16] }}</td><td>{{ u.created_by }}</td></tr>
+  {% else %}<tr><td colspan="6" class="muted">-</td></tr>{% endfor %}</tbody></table></div>
+</div>
+</div>
+{% endblock %}
