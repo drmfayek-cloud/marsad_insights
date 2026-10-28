@@ -26,7 +26,7 @@
 | Budget utilisation, Q1 2026 | 22% (SAR 1.43B of SAR 6.40B) | Budget sheet, treatment lines total |
 | Accrued GSS value not yet invoiced | SAR 79.4M | Accrued-expenses sheet |
 
-**Screens**: checked in a browser in English and Arabic (right to left), on desktop and on a phone-width screen.
+**Screens**: the Option A design ('Vibrant tiles') was checked in a browser in English and Arabic (right to left), in light and dark mode, and at phone width. The font is bundled with the app, so nothing is loaded from the internet.
 
 ## Not completed here
 

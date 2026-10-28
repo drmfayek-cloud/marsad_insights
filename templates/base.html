@@ -4,41 +4,56 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}{{ t('app') }}{% endblock %} · {{ t('app') }}</title>
+<link rel="preload" href="{{ url_for('static', filename='fonts/IBMPlexSansArabic-Regular.woff') }}" as="font" type="font/woff" crossorigin>
 <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
 {% if g.user %}
 <header class="topbar">
-  <button class="menu" data-menu aria-label="Menu">&#9776;</button>
-  <div class="brand"><b>{{ t('app') }}</b><span>{{ t('tagline') }}</span></div>
-  <a class="langlink" href="{{ url_for('set_lang', code='ar' if lang() == 'en' else 'en') }}">{{ t('lang_switch') }}</a>
-</header>
-<div class="shell">
-  <nav class="side" id="side">
+  <div class="bar">
+    <a class="brand" href="{{ url_for('home') }}">
+      <span class="logo">{{ theme.icon('pulse', 22) }}</span>
+      <span class="names"><b>{{ t('app') }}</b><span>{{ t('tagline') }}</span></span>
+    </a>
+    <div class="tools">
+      <a class="langbtn" href="{{ url_for('set_lang', code='ar' if lang() == 'en' else 'en') }}">{{ t('lang_switch') }}</a>
+      {% if g.user.role == 'admin' %}
+      <details class="menu-pop">
+        <summary>{{ theme.icon('layers', 18) }}<span>{{ pick('Admin', 'الإدارة') }}</span></summary>
+        <div class="pop">
+          <a href="{{ url_for('data_page') }}">{{ t('data') }}</a>
+          <a href="{{ url_for('periods') }}">{{ t('periods') }}</a>
+          <a href="{{ url_for('users') }}">{{ t('users') }}</a>
+          <a href="{{ url_for('audit_log') }}">{{ t('audit') }}</a>
+        </div>
+      </details>
+      {% endif %}
+      <details class="menu-pop">
+        <summary>{{ theme.icon('people', 18) }}<span>{{ g.user.name.split(' ')[0] }}</span></summary>
+        <div class="pop">
+          <div class="who"><b>{{ g.user.name }}</b><span>{{ ROLES[g.user.role] }}</span></div>
+          <a href="{{ url_for('account') }}">{{ t('account') }}</a>
+          <a href="{{ url_for('logout') }}">{{ t('sign_out') }}</a>
+        </div>
+      </details>
+    </div>
+  </div>
+  <nav class="pills" aria-label="{{ pick('Pages', 'الصفحات') }}">
     {% for p in PAGES %}
     <a href="{{ url_for('page', slug=p.slug, period=request.args.get('period'), tpa=request.args.get('tpa')) }}"
        class="{{ 'on' if request.path == url_for('page', slug=p.slug) }}">{{ pick(p.en, p.ar) }}</a>
     {% endfor %}
-    {% if g.user.role == 'admin' %}
-    <div class="grp">{{ pick('Administration', 'الإدارة') }}</div>
-    <a href="{{ url_for('data_page') }}" class="{{ 'on' if request.path.startswith('/data') }}">{{ t('data') }}</a>
-    <a href="{{ url_for('periods') }}" class="{{ 'on' if request.path.startswith('/periods') }}">{{ t('periods') }}</a>
-    <a href="{{ url_for('users') }}" class="{{ 'on' if request.path.startswith('/admin/users') }}">{{ t('users') }}</a>
-    <a href="{{ url_for('audit_log') }}" class="{{ 'on' if request.path.startswith('/admin/audit') }}">{{ t('audit') }}</a>
-    {% endif %}
-    <div class="who"><b>{{ g.user.name }}</b><span>{{ ROLES[g.user.role] }}</span>
-      <div class="links"><a href="{{ url_for('account') }}">{{ t('account') }}</a> · <a href="{{ url_for('logout') }}">{{ t('sign_out') }}</a></div></div>
   </nav>
-  <main class="main">
-    {% if config.DEMO %}<div class="flash info">{{ t('demo') }}</div>{% endif %}
-    {% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}{% endwith %}
-    {% block content %}{% endblock %}
-  </main>
-</div>
+</header>
+<main class="main">
+  {% if config.DEMO %}<div class="flash info">{{ t('demo') }}</div>{% endif %}
+  {% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}{% endwith %}
+  {% block content %}{% endblock %}
+</main>
 {% else %}
 <main class="auth">
-  <a class="langlink" href="{{ url_for('set_lang', code='ar' if lang() == 'en' else 'en') }}">{{ t('lang_switch') }}</a>
+  <a class="langbtn dark" href="{{ url_for('set_lang', code='ar' if lang() == 'en' else 'en') }}">{{ t('lang_switch') }}</a>
   {% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}{% endwith %}
   {% block auth %}{% endblock %}
 </main>

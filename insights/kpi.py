@@ -196,9 +196,11 @@ def ex05(c):
         return nodata(MISSING["F2"])
     gv = sum(s["at_issue"] for s in sample_rows(c))
     daily = sum(once_per_ref([f for f in flags(c) if is_claim(f)]).values()) if c.get("F1") else 0
-    sub = pick(f"GSS pre-payment assurance {sar(gv)}", f"ضمان GSS قبل الصرف {sar(gv)}")
     if daily:
-        sub += pick(f" · daily claims review {sar(daily)}", f" · المراجعة اليومية للمطالبات {sar(daily)}")
+        sub = pick(f"GSS pre-payment assurance {sar(gv)} · daily claims review {sar(daily)}",
+                   f"ضمان GSS قبل الصرف {sar(gv)} · المراجعة اليومية للمطالبات {sar(daily)}")
+    else:
+        sub = pick("GSS pre-payment assurance · identified stage", "ضمان GSS قبل الصرف · مرحلة التحديد")
     return R(sar(gv + daily), sub, raw=gv + daily)
 
 
@@ -273,7 +275,7 @@ def dr01(c):
         tab = table([pick("Reviewer (KPMG only)", "المراجع (داخلي)"), t("reviewed"), t("flags"), pick("Flag rate", "نسبة الملاحظات")],
                     [[k, num(a), num(b), pct(b / a if a else 0)] for k, (a, b) in sorted(rv.items())])
     return R(num(total / nd if nd else 0), pick("average per working day", "المتوسط لكل يوم عمل"),
-             chart=charts.columns(labels, [(t("reviewed"), [by[k] for k in keys])]), table=tab, raw=total)
+             chart=charts.columns(labels, [(t("reviewed"), [by[k] for k in keys])], tones=["teal"]), table=tab, raw=total)
 
 
 def dr02(c):
@@ -375,7 +377,7 @@ def hd02(c):
         k = f"0-{b1}" if a <= b1 else f"{b1 + 1}-{b2}" if a <= b2 else f"{b2 + 1}-{b3}" if a <= b3 else f">{b3}"
         bands[k] += 1
     return R(num(len(open_)), pick(f"open at {c.end}", f"مفتوحة حتى {c.end}"),
-             chart=charts.columns(list(bands), [(pick("Days since receipt", "أيام منذ الاستلام"), list(bands.values()))]),
+             chart=charts.columns(list(bands), [(pick("Days since receipt", "أيام منذ الاستلام"), list(bands.values()))], tones=["amber"]),
              raw=len(open_))
 
 
@@ -536,7 +538,7 @@ def gs06(c):
              pick(f"{sum(fails.values())} fail, {sum(parts.values())} partial · {cf} critical fail",
                   f"{sum(fails.values())} إخفاق، {sum(parts.values())} جزئي · {cf} إخفاق حرج"),
              chart=charts.columns(keys, [(pick("Fail", "إخفاق"), [fails[k] for k in keys]),
-                                         (pick("Partial", "جزئي"), [parts[k] for k in keys])]),
+                                         (pick("Partial", "جزئي"), [parts[k] for k in keys])], tones=["coral", "amber"]),
              raw=sum(fails.values()) + sum(parts.values()))
 
 
@@ -895,7 +897,7 @@ def tpas(data):
     return sorted(s)
 
 
-def exec_trend(c):
+def exec_trend(c, selected=None):
     """Two monthly charts (all months, current TPA filter): encounters reviewed, and the finding rate."""
     if not c.get("F1"):
         return None
@@ -907,9 +909,22 @@ def exec_trend(c):
         if f["status"] == "Confirmed" and c.tpa_ok(f):
             flg[f["date"][:7]].add(f["ref"] or f["log_id"])
     ms = [m for m in sorted(rev) if rev[m]]
-    return dict(volume=charts.columns(ms, [(t("encounters"), [rev[m] for m in ms])]),
+    return dict(volume=charts.columns(ms, [(t("encounters"), [rev[m] for m in ms])], tones=["teal"], highlight_last=True, highlight=selected),
                 rate=charts.columns(ms, [(pick("Finding rate", "نسبة الحالات ذات الملاحظات"),
-                                          [len(flg[m]) / rev[m] for m in ms])], pct=True))
+                                          [len(flg[m]) / rev[m] for m in ms])], pct=True, tones=["indigo"], highlight_last=True, highlight=selected))
+
+
+def history(kids, data, period, tpa, n=6):
+    """Raw values of each KPI over the last n months up to the period, for tile sparklines."""
+    ms = [m for m in months(data) if period == "all" or m <= period][-n:]
+    out = {k: [] for k in kids}
+    for m in ms:
+        c = Ctx(data, m, tpa)
+        for k in kids:
+            r = compute(k, c)
+            v = r.get("raw")
+            out[k].append(v if isinstance(v, (int, float)) and r.get("state") == "ok" else None)
+    return out
 
 
 def serialise(results):

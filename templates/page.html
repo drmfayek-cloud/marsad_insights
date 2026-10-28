@@ -2,10 +2,12 @@
 {% block title %}{{ pick(pg.en, pg.ar) }}{% endblock %}
 
 {% macro kpi_card(k, r, wide=False) %}
-<article class="card kpi state-{{ r.state }}{{ ' wide' if wide or r.chart or r.table }}">
+{% set tone, ic = theme.style(k.id) %}
+<article class="card kpi t-{{ tone }} state-{{ r.state }}{{ ' wide' if wide or r.chart or r.table }}">
   <header>
-    <span class="kid">{{ k.id }}</span>
+    <span class="chip">{{ theme.icon(ic) }}</span>
     <h3>{{ pick(k.name_en, k.name_ar) }}</h3>
+    <span class="kid">{{ k.id }}</span>
   </header>
   {% if r.state == 'nodata' %}
     <div class="v pending">{{ t('capture') }}</div>
@@ -14,7 +16,13 @@
     <div class="v pending">-</div><div class="note">{{ r.note }}</div>
   {% else %}
     <div class="v">{{ r.value if r.value is not none else '-' }}</div>
-    {% if r.sub %}<div class="s">{{ r.sub }}</div>{% endif %}
+    <div class="subrow">
+      {% if r.sub %}<div class="s">{{ r.sub }}</div>{% endif %}
+      {% if sparks and sparks.get(k.id) %}{{ sparks[k.id] }}{% endif %}
+    </div>
+    {% if k.unit and k.unit.startswith('%') and r.raw is number and not r.chart %}
+      <div class="meter" role="img" aria-label="{{ r.value }}"><div style="width: {{ [[r.raw, 0]|max, 1]|min * 100 }}%"></div></div>
+    {% endif %}
     {% if r.state == 'partial' and r.note %}<div class="note">{{ r.note }}</div>{% endif %}
     {% if r.chart %}<div class="chartbox">{{ r.chart }}</div>{% endif %}
     {% if r.table and r.table.rows %}
@@ -72,8 +80,8 @@
   </div>
   {% if trend %}<h2 class="sect">{{ t('trend') }}</h2>
   <div class="grid">
-    <div class="card wide"><h3>{{ t('encounters') }}</h3><div class="chartbox">{{ trend.volume }}</div></div>
-    <div class="card wide"><h3>{{ pick('Finding rate in reviewed encounters', 'نسبة الحالات ذات الملاحظات') }}</h3><div class="chartbox">{{ trend.rate }}</div>
+    <div class="card wide t-teal"><h3 class="ctitle">{{ t('encounters') }}</h3><div class="chartbox">{{ trend.volume }}</div></div>
+    <div class="card wide t-indigo"><h3 class="ctitle">{{ pick('Finding rate in reviewed encounters', 'نسبة الحالات ذات الملاحظات') }}</h3><div class="chartbox">{{ trend.rate }}</div>
       <p class="small muted">{{ pick('Encounters are screened against risk rules; the rate is not an error rate for all approvals (D-08).', 'تخضع الحالات لقواعد المخاطر، فلا تمثل النسبة معدل خطأ لكل الموافقات.') }}</p></div>
   </div>{% endif %}
 {% else %}

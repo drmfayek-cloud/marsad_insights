@@ -184,6 +184,8 @@ DR-03 (review turnaround) also needs a received time and a reviewed time for eac
 | `config/settings.yaml` | TPA name variants (add one when an upload warns about a new spelling), flag-family names in English and Arabic, weekend days, outlier threshold, critical GSS checkpoints, dispute age bands |
 | `config/kpis.yaml` | KPI names, definitions (English and Arabic), formulas, caveats, placement on the CFO page |
 | `insights/kpi.py` | The calculations. Each KPI is one short function named after its ID (for example `ex04`). |
+| `insights/theme.py` | Colour and icon of each KPI tile, and fixed colours for meaningful labels (Unsatisfactory, Maintained, ...) |
+| `static/app.css` | The look: palette (light and dark), fonts, tiles, header |
 
 Decisions D-18 to D-21 are built as recommended: review coverage on the CFO page, amount at risk counted once per encounter, the claims headline taken from the GSS sample, and financial KPIs taken from the quarterly accounting report. A different decision means a small change in `kpis.yaml` (wording) and in `kpi.py` (calculation).
 
@@ -224,10 +226,11 @@ insights/deid.py       hashing and pseudonyms
 insights/store.py      versioned datasets, publish and roll back
 insights/auth.py       passwords, MFA, roles, CSRF
 insights/charts.py     SVG charts
+insights/theme.py      colours, icons and sparklines (Option A, 'Vibrant tiles')
 insights/i18n.py       English and Arabic screen text
 config/kpis.yaml       KPI dictionary v0.3
 config/settings.yaml   editable settings
-templates/, static/    screens and styles
+templates/, static/    screens and styles; static/fonts holds IBM Plex Sans Arabic (SIL Open Font License, OFL.txt)
 seed_demo.py           synthetic demo data (preview only)
 tests/test_app.py      automated checks: python -m unittest discover -s tests
 ```

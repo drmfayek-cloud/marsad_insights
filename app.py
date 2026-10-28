@@ -11,7 +11,7 @@ import tempfile
 
 from flask import (Flask, Response, abort, flash, g, redirect, render_template, request, session, url_for)
 
-from insights import auth, config, db, deid, kpi, store
+from insights import auth, config, db, deid, kpi, store, theme
 from insights.i18n import lang, pick, t
 from insights.parsers import ParseError, parse
 from insights.xlsx_templates import governance_template
@@ -45,7 +45,7 @@ def create_app():
     store.init(data_dir)
     bootstrap(app)
 
-    app.jinja_env.globals.update(t=t, pick=pick, lang=lang, csrf_token=auth.csrf_token, ROLES=auth.ROLES,
+    app.jinja_env.globals.update(t=t, pick=pick, lang=lang, csrf_token=auth.csrf_token, ROLES=auth.ROLES, theme=theme,
                                  PAGES=config.PAGES, KINDS=store.KINDS, KINDS_AR=store.KINDS_AR)
 
     @app.before_request
@@ -203,12 +203,14 @@ def create_app():
             ctx = kpi.Ctx(data, period, tpa, internal=g.user["role"] in auth.INTERNAL)
             results = kpi.compute_page(pg["code"], ctx)
             badge = "filtered" if (snap and tpa) else "provisional"
-        trend = None
-        if pg["code"] == "EX":
-            trend = kpi.exec_trend(kpi.Ctx(data, "all", tpa))
+        trend, sparks = None, {}
+        if pg["code"] == "EX" and data:
+            trend = kpi.exec_trend(kpi.Ctx(data, "all", tpa), selected=period)
+            hist = kpi.history([k["id"] for k in config.kpis_for("EX")], data, period, tpa)
+            sparks = {k: theme.sparkline(v, theme.style(k)[0]) for k, v in hist.items()}
         defs = config.kpis_for(pg["code"])
         return render_template("page.html", pg=pg, defs=defs, results=results, months=ms, period=period, tpa=tpa,
-                               tpas=tpa_list, badge=badge, snap=snap, trend=trend, has_data=bool(data),
+                               tpas=tpa_list, badge=badge, snap=snap, trend=trend, sparks=sparks, has_data=bool(data),
                                as_of=data_as_of())
 
     # ------------------------------------------------------------------ data uploads (admin)
