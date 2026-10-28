@@ -1,6 +1,6 @@
 # MARSAD Insights: deployment and operating guide
 
-Version 1.0 · 28 October 2026 · KPI dictionary v0.3
+Version 1.2 · 28 October 2026 · KPI dictionary v0.3 · disputes tracker v1.0
 
 MARSAD Insights is the stakeholder dashboard for the CNHI audit and approval project. It is a separate application from MARSAD live, with its own link and user list. You keep working in your Excel workbooks; you upload them to the dashboard, it checks them, and you publish. The dashboard then shows the 55 KPIs on seven bilingual pages (English and Arabic).
 
@@ -139,7 +139,7 @@ Data and users stay in the volume. Database changes apply automatically on start
 | F1 | MARSAD Daily Record & Action Tracker (.xlsm) | Executive, daily review, FWA pages |
 | F2 | MARSAD GSS Assurance Workbook (.xlsm) | GSS page and the claims headline (EX-05, EX-09) |
 | F4 | Quarterly accounting report (.xlsx). Enter the quarter (for example `2026-Q1`) if the sheet names do not show it. | Financial page |
-| F3 | Hospital disputes tracker (template on the upload page) | Disputes page, EX-07 and EX-08 |
+| F3 | CNHI Hospital Disputes Tracker v1.0 (blank copy on the upload page; see section 7a) | Disputes page, EX-07 and EX-08 |
 | F5 | Governance register (template on the upload page) | Governance page, EX-10, FW-08 |
 
 3. **Check the preview** after each upload. It shows what was read and lists any problems, such as a skipped row, an unknown flag code or a missing optional column. Then press **Publish**. To go back, open an older upload and press **Roll back to this version**.
@@ -152,7 +152,7 @@ Data and users stay in the volume. Database changes apply automatically on start
 | When | What you do | Time |
 |---|---|---|
 | Daily or weekly | Save the daily register and upload F1; upload F2 after GSS reports are issued | About 2 minutes |
-| Weekly | Upload the disputes tracker (F3) | 1 minute |
+| Weekly, and after each opinion batch | Update and upload the disputes tracker (F3) | 1 minute |
 | Monthly | Update and upload the governance register (F5); close the month once CNHI approves the report | 5 minutes |
 | Quarterly | Upload the accounting report (F4) | 2 minutes |
 
@@ -174,6 +174,36 @@ These columns switch on KPIs that show "data capture in progress" today. Type th
 | Daily register, Daily Log | Fill `Status` and `Date closed` when a flag is resolved | The "closed or recovered" stage in FW-05 |
 
 DR-03 (review turnaround) also needs a received time and a reviewed time for each encounter. The daily intake records totals per day, so DR-03 stays empty until that is captured.
+
+---
+
+## 7a. Hospital disputes tracker (F3)
+
+The tracker has one sheet per job:
+
+| Sheet | One row per | You enter |
+|---|---|---|
+| Batches | Objection file received from a hospital | Received date, KPMG opinion date, date sent to CNHI. Every dispute in the batch takes these dates unless its own row overrides them. |
+| Disputes | Disputed claim or pre-authorization | References, rejection codes, claimed and approved amounts, KPMG position, recommended action, value to pay (partial acceptances only), FWA indicator, comment, CNHI's final decision |
+| Actions | Action on a dispute or batch | Date, action type, team member, hours, whether the hours are a backfilled estimate |
+
+Grey columns are calculated (amount disputed, received and opinion dates, value maintained, outcome, closure date, days to opinion, hours). Do not type over them. The upload also works when the file was saved without recalculation: the dashboard applies the same rules.
+
+How the dashboard reads it:
+
+| KPI | Counts |
+|---|---|
+| EX-07 | Disputes with a KPMG opinion date in the month |
+| EX-08 | Of those, the share where the objection was not accepted (rejection maintained in full) |
+| HD-01, HD-02 | Disputes by received date; open = not yet answered by KPMG |
+| HD-03, HD-05 | Claimed less approved amount, and the part maintained. A dispute without an approved amount is left out and the tile says how many. |
+| HD-04 | KPMG position: Not accepted = Maintained, Partially accepted = Partially maintained, Accepted = Reversed |
+| HD-06 | Working days from the received date to the KPMG opinion date |
+| HD-07 | Hours in the Actions sheet, from October 2026 |
+
+The upload preview lists disputes without a received date, an opinion date or an approved amount, so you can complete them before publishing. The dashboard keeps the hospital name, theme, position, action and FWA indicator. It never reads the comment, argument or reference columns.
+
+The Almodawat source file contains patient names and national IDs. They were not copied into the tracker; keep that source file out of shared folders.
 
 ---
 

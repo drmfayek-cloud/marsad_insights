@@ -287,43 +287,87 @@ def parse_f2(path):
 
 
 # ------------------------------------------------------------------ F3 hospital disputes tracker
+# Reads tracker v1.0 (Batches, Disputes, Actions) and the earlier v0.1 template (Disputes, Time Log).
 def parse_f3(path):
     wb = open_book(path)
     warn = []
-    t = Table(find_sheet(wb, "Disputes"), ["Dispute ID", "Received date"], max_col=25)
-    disputes = []
+    # batch dates (v1.0): disputes inherit them unless their own row overrides
+    batches = {}
+    ws = find_sheet(wb, "Batches", required=False)
+    if ws is not None:
+        bt = Table(ws, ["Batch ID", "Received date"], max_col=14)
+        for r in bt.rows:
+            bid = to_text(bt.get(r, "Batch ID"))
+            if bid:
+                batches[bid] = (to_date(bt.get(r, "Received date")), to_date(bt.get(r, "KPMG opinion date")))
+    OUTCOME = {"Not accepted": "Maintained", "Partially accepted": "Partially maintained", "Accepted": "Reversed",
+               "Withdrawn by hospital": "Withdrawn by hospital"}
+    t = Table(find_sheet(wb, "Disputes"), ["Dispute ID", "Received date"], max_col=45)
+    disputes, no_date, no_amount = [], 0, 0
     for r in t.rows:
         did = to_text(t.get(r, "Dispute ID"))
         if not did or did.upper().startswith("EXAMPLE"):
             continue
-        rec = to_date(t.get(r, "Received date"))
-        if not rec:
-            warn.append(f"Dispute {did}: no received date; skipped.")
-            continue
-        value, kept = to_num(t.get(r, "Value disputed (SAR)")) or 0, to_num(t.get(r, "Value maintained (SAR)"))
-        if kept is not None and kept > value:
-            warn.append(f"Dispute {did}: value maintained exceeds value disputed.")
-        disputes.append(dict(id=did, received=rec, hospital=to_text(t.get(r, "Hospital")), tpa=tpa_name(t.get(r, "TPA")),
-                             pathway=to_text(t.get(r, "Pathway")), type=to_text(t.get(r, "Dispute type")), value=value,
-                             response=to_date(t.get(r, "Response date")), status=to_text(t.get(r, "Status")),
-                             closed=to_date(t.get(r, "Closure date")), outcome=to_text(t.get(r, "Outcome")), maintained=kept))
+        position = to_text(t.get(r, "KPMG position"))
+        b_rec, b_op = batches.get(to_text(t.get(r, "Batch ID")), (None, None))
+        # calculated columns are re-derived when the file was saved without recalculation (same rules as the workbook)
+        rec = to_date(t.get(r, "Received date")) or to_date(t.get(r, "Received date (if different from batch)")) or b_rec
+        no_date += 0 if rec else 1
+        claimed, approved = to_num(t.get(r, "Claimed amount (SAR)")), to_num(t.get(r, "Approved amount (SAR)"))
+        value = to_num(t.get(r, "Amount disputed (SAR)", "Value disputed (SAR)"))
+        if value is None and claimed is not None and approved is not None:
+            value = claimed - approved
+        kept = to_num(t.get(r, "Value maintained (SAR)"))
+        pay = to_num(t.get(r, "Value to pay (SAR) - partial only"))
+        if kept is None and value is not None:
+            kept = (value if position in ("Not accepted", "Withdrawn by hospital") else 0 if position == "Accepted"
+                    else value - pay if position == "Partially accepted" and pay is not None else None)
+        opinion = to_date(t.get(r, "KPMG opinion date", "Response date"))
+        if not opinion and position and position != "Pending":
+            opinion = to_date(t.get(r, "KPMG opinion date (if different from batch)")) or b_op
+        outcome = to_text(t.get(r, "Outcome")) or OUTCOME.get(position, "")
+        closed = to_date(t.get(r, "Closure date")) or (opinion if outcome else None)
+        if value is None and position != "Pending":
+            no_amount += 1
+        if kept is not None and value is not None and kept > value:
+            warn.append(f"Dispute {did}: value maintained exceeds the amount disputed.")
+        disputes.append(dict(
+            id=did, batch=to_text(t.get(r, "Batch ID")), received=rec, hospital=to_text(t.get(r, "Hospital")),
+            tpa=tpa_name(t.get(r, "TPA")), pathway=to_text(t.get(r, "Pathway")), round=to_text(t.get(r, "Round")),
+            type=to_text(t.get(r, "Dispute theme", "Dispute type")), claimed=claimed,
+            value=value, response=opinion, status=to_text(t.get(r, "Status")),
+            closed=closed, outcome=outcome, maintained=kept,
+            position=position, action=to_text(t.get(r, "Recommended action")), fwa=to_text(t.get(r, "FWA indicator")) or "None",
+            cnhi=to_text(t.get(r, "CNHI final decision"))))
+    if no_date:
+        warn.append(f"{no_date} dispute(s) have no received date (enter it on the batch); they are left out of monthly intake and ageing.")
+    if no_amount:
+        warn.append(f"{no_amount} dispute(s) reviewed without an approved amount; value disputed and value maintained exclude them.")
+    undated = sum(1 for d in disputes if d["position"] not in ("", "Pending") and not d["closed"])
+    if undated:
+        warn.append(f"{undated} KPMG opinion(s) have no opinion date (enter it on the batch); they are left out of EX-07, EX-08 and the outcome KPIs.")
     time_log = []
-    ws = find_sheet(wb, "Time Log", required=False)
+    ws = find_sheet(wb, "Actions", required=False) or find_sheet(wb, "Time Log", required=False)
     if ws is not None:
-        t = Table(ws, ["Date", "Hours"], max_col=10)
+        t = Table(ws, ["Date", "Hours"], max_col=12)
         for r in t.rows:
             d, h = to_date(t.get(r, "Date")), to_num(t.get(r, "Hours"))
             did = to_text(t.get(r, "Dispute ID"))
             if not d or not h or did.upper().startswith("EXAMPLE"):
                 continue
             time_log.append(dict(date=d, member=deid.person(t.get(r, "Team member")), dispute=did,
-                                 activity=to_text(t.get(r, "Activity")), hours=h,
+                                 activity=to_text(t.get(r, "Action type", "Activity")), hours=h,
                                  estimated=norm(t.get(r, "Estimated? (backfilled)")) == "yes"))
     ids = {d["id"] for d in disputes}
     if len(ids) != len(disputes):
         warn.append("Duplicate Dispute IDs found; each is counted as recorded.")
-    summary = {"Disputes": len(disputes), "Closed": sum(1 for d in disputes if d["closed"]),
-               "Time-log rows": len(time_log), "Hours logged": round(sum(x["hours"] for x in time_log), 1),
+    hosp = sorted({d["hospital"] for d in disputes if d["hospital"]})
+    summary = {"Disputes": len(disputes), "Hospitals": ", ".join(hosp),
+               "KPMG opinions issued": sum(1 for d in disputes if d["position"] and d["position"] != "Pending"),
+               "Of which dated": sum(1 for d in disputes if d["closed"]),
+               "Pending KPMG review": sum(1 for d in disputes if d["position"] == "Pending"),
+               "With an FWA indicator": sum(1 for d in disputes if d["fwa"] not in ("", "None")),
+               "Action / time-log rows": len(time_log), "Hours logged": round(sum(x["hours"] for x in time_log), 1),
                "Of which estimated": round(sum(x["hours"] for x in time_log if x["estimated"]), 1)}
     return dict(data=dict(disputes=disputes, time=time_log), summary=summary, warnings=warn)
 

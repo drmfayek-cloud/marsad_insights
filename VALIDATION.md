@@ -7,7 +7,7 @@
 - the administrator role being required for data, users and month close;
 - daily-register upload: patient narrative, staff and owner names are not stored; references are hashed; TPA names are normalised;
 - KPI arithmetic: encounters counted once (D-02), amount counted once per encounter (D-19), coverage, backlog and validation rate;
-- the disputes tracker template round trip: the example row is ignored, partial outcomes are handled, and working days exclude Friday and Saturday;
+- the disputes tracker v1.0 round trip, saved without recalculation: batch dates are inherited, the example action row is ignored, amount disputed and value maintained are derived, pending disputes stay open, and working days exclude Friday and Saturday;
 - the governance register template round trip;
 - every page rendering in English and Arabic without a calculation error;
 - month close freezing figures as Approved, and reopening.
@@ -26,6 +26,8 @@
 | Budget utilisation, Q1 2026 | 22% (SAR 1.43B of SAR 6.40B) | Budget sheet, treatment lines total |
 | Accrued GSS value not yet invoiced | SAR 79.4M | Accrued-expenses sheet |
 
+**Disputes tracker v1.0** (132 disputes from the four files of 28 October 2026) uploaded and published. The preview reads 132 disputes, 129 KPMG opinions (95 dated), 3 pending and 24 FWA indicators, matching the tracker's Summary sheet. It warns about 128 disputes without a received date, 34 opinions without a date and 129 disputes without an approved amount. October 2026 shows EX-07 = 95 and EX-08 = 93% (88 of 95, Al-Ahly batch only, the one batch with an opinion date). This uploaded check also found and fixed a crash when a dispute had no received date.
+
 **Screens**: the Option A design ('Vibrant tiles') was checked in a browser in English and Arabic (right to left), in light and dark mode, and at phone width. The font is bundled with the app, so nothing is loaded from the internet.
 
 ## Not completed here
@@ -34,4 +36,5 @@
 - No deployment was made to Render or to a server.
 - Working days exclude Friday and Saturday but not official holidays.
 - Caveats under each KPI are written in English in both languages. Names, definitions and screen text are in Arabic.
-- The hospital disputes tracker and the governance register are new templates with no real data yet. Their KPIs were tested on synthetic entries only.
+- The governance register is a new template with no real data yet; its KPIs were tested on synthetic entries only.
+- The dispute value KPIs (HD-03, HD-05) and turnaround (HD-06) were checked only on synthetic entries, because no source file gives an approved amount and most batches have no received date yet.

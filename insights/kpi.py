@@ -361,38 +361,66 @@ def _hd(c):
 def hd01(c):
     if _hd(c):
         return _hd(c)
-    rec = [d for d in disputes(c) if c.inp(d["received"])]
-    by = Counter(d["type"] or "-" for d in rec)
-    return R(num(len(rec)), "", chart=charts.hbar(by.most_common(), rtl=lang() == "ar"), raw=len(rec))
+    ds = disputes(c)
+    rec = [d for d in ds if c.inp(d["received"])]
+    by_h = Counter(d["hospital"] or "-" for d in rec)
+    by_t = Counter(d["type"] or "-" for d in rec)
+    undated = sum(1 for d in ds if not d["received"])
+    res = R(num(len(rec)), pick(f"{len(by_h)} hospitals", f"{len(by_h)} مستشفيات") if rec else "",
+            chart=charts.hbar(by_h.most_common(), rtl=lang() == "ar"),
+            table=table([pick("Dispute theme", "موضوع الاعتراض"), t("count")], [[k, num(n)] for k, n in by_t.most_common()]),
+            raw=len(rec))
+    if undated:
+        res["state"], res["note"] = "partial", pick(f"{undated} dispute(s) have no received date yet: enter it on their batch in the tracker.",
+                                               f"{undated} اعتراض بلا تاريخ استلام: أدخله على الدفعة في سجل الاعتراضات.")
+    return res
 
 
 def hd02(c):
     if _hd(c):
         return _hd(c)
     b1, b2, b3 = config.SETTINGS.get("dispute_age_bands", [5, 10, 20])
-    open_ = [d for d in disputes(c) if c.upto(d["received"]) and not (d["closed"] and d["closed"] <= c.end)]
+    open_ = [d for d in disputes(c) if c.upto(d["received"]) and d.get("position") in (None, "", "Pending")
+             and not (d["closed"] and d["closed"] <= c.end)]
     bands = {f"0-{b1}": 0, f"{b1 + 1}-{b2}": 0, f"{b2 + 1}-{b3}": 0, f">{b3}": 0}
     for d in open_:
         a = days(d["received"], c.end)
         k = f"0-{b1}" if a <= b1 else f"{b1 + 1}-{b2}" if a <= b2 else f"{b2 + 1}-{b3}" if a <= b3 else f">{b3}"
         bands[k] += 1
-    return R(num(len(open_)), pick(f"open at {c.end}", f"مفتوحة حتى {c.end}"),
+    pend = sum(1 for d in disputes(c) if d.get("position") == "Pending")
+    return R(num(len(open_)), pick(f"open at {c.end}", f"مفتوحة حتى {c.end}") + (pick(f" · {pend} pending review", f" · {pend} بانتظار المراجعة") if pend else ""),
              chart=charts.columns(list(bands), [(pick("Days since receipt", "أيام منذ الاستلام"), list(bands.values()))], tones=["amber"]),
              raw=len(open_))
+
+
+def _missing_amounts(ds):
+    n = sum(1 for d in ds if d["value"] is None and d.get("position") != "Pending")
+    return pick(f"{n} of {len(ds)} disputes have no approved amount yet, so their value is not included.",
+                f"{n} من {len(ds)} اعتراضا بلا مبلغ معتمد بعد، لذلك لم تدخل قيمتها.") if n else ""
 
 
 def hd03(c):
     if _hd(c):
         return _hd(c)
-    v = sum(d["value"] for d in disputes(c) if c.inp(d["received"]))
-    return R(sar(v), "", raw=v)
+    ds = [d for d in disputes(c) if c.inp(d["received"]) or (not d["received"] and c.inp(d["closed"]))]
+    known = [d["value"] for d in ds if d["value"] is not None]
+    v = sum(known)
+    claimed = sum(d.get("claimed") or 0 for d in ds)
+    res = R(sar(v) if known or not ds else "-", pick(f"claimed value of these claims {sar(claimed)}", f"القيمة المطالب بها لهذه المطالبات {sar(claimed)}") if claimed else "",
+            raw=v)
+    note = _missing_amounts(ds)
+    if note:
+        res["state"], res["note"] = "partial", note
+    return res
 
 
 def _kept(d):
+    if d["maintained"] is not None:
+        return d["maintained"]
+    if d["value"] is None:
+        return 0
     if d["outcome"] in ("Maintained", "Withdrawn by hospital"):
-        return d["maintained"] if d["maintained"] is not None else d["value"]
-    if d["outcome"] == "Partially maintained":
-        return d["maintained"] or 0
+        return d["value"]
     return 0
 
 
@@ -403,21 +431,28 @@ def hd04(c):
     by = defaultdict(lambda: [0, 0.0])
     for d in closed:
         by[d["outcome"] or "-"][0] += 1
-        by[d["outcome"] or "-"][1] += d["value"]
+        by[d["outcome"] or "-"][1] += d["value"] or 0
     order = ["Maintained", "Partially maintained", "Reversed", "Withdrawn by hospital"]
     keys = [k for k in order if k in by] + [k for k in by if k not in order]
-    return R(num(len(closed)), pick("closed disputes", "اعتراضات مغلقة"),
+    fwa = sum(1 for d in closed if d.get("fwa") not in (None, "", "None"))
+    return R(num(len(closed)), pick(f"KPMG opinions issued · {fwa} with an FWA indicator", f"آراء صادرة · {fwa} عليها مؤشر احتيال أو هدر"),
              chart=charts.donut([(k, by[k][0]) for k in keys]),
-             table=table([pick("Outcome", "النتيجة"), t("count"), pick("Value disputed", "القيمة محل الاعتراض")],
-                         [[k, num(by[k][0]), sar(by[k][1])] for k in keys]), raw=len(closed))
+             table=table([pick("Outcome", "النتيجة"), t("count"), pick("Amount disputed", "المبلغ محل الاعتراض")],
+                         [[k, num(by[k][0]), sar(by[k][1]) if any(d["value"] is not None for d in closed if (d["outcome"] or "-") == k) else "-"]
+                          for k in keys]), raw=len(closed))
 
 
 def hd05(c):
     if _hd(c):
         return _hd(c)
     closed = [d for d in disputes(c) if c.inp(d["closed"])]
-    v, disputed = sum(_kept(d) for d in closed), sum(d["value"] for d in closed)
-    return R(sar(v), f"{pct(v / disputed)} {t('of')} {sar(disputed)}" if disputed else "", raw=v)
+    v, disputed = sum(_kept(d) for d in closed), sum(d["value"] or 0 for d in closed)
+    known = any(d["value"] is not None or d["maintained"] is not None for d in closed)
+    res = R(sar(v) if known or not closed else "-", f"{pct(v / disputed)} {t('of')} {sar(disputed)}" if disputed else "", raw=v)
+    note = _missing_amounts(closed)
+    if note:
+        res["state"], res["note"] = "partial", note
+    return res
 
 
 def hd06(c):
@@ -425,6 +460,9 @@ def hd06(c):
         return _hd(c)
     xs = [working_days(d["received"], d["response"]) for d in disputes(c) if c.inp(d["response"]) and d["received"]]
     m = median(xs)
+    if not xs and any(c.inp(d["response"]) for d in disputes(c)):
+        return nodata(pick("Needs the received date of the disputes answered in this period: enter it on their batch in the tracker.",
+                           "يتطلب تاريخ استلام الاعتراضات التي تم الرد عليها في هذه الفترة: أدخله على الدفعة في السجل."))
     return R(num(m) if m is not None else "-", pick(f"working days, median of {len(xs)}", f"أيام عمل، الوسيط من {len(xs)}"),
              raw=m)
 
@@ -434,7 +472,8 @@ def hd07(c):
         return _hd(c)
     tl = [x for x in c.get("F3")["time"] if c.inp(x["date"])]
     if not tl:
-        return nodata("No hours logged for this period in the Time Log.")
+        return nodata(pick("No hours logged for this period in the tracker's Actions sheet.",
+                           "لم تسجل ساعات لهذه الفترة في ورقة الإجراءات في سجل الاعتراضات."))
     h, est = sum(x["hours"] for x in tl), sum(x["hours"] for x in tl if x["estimated"])
     by = defaultdict(float)
     for x in tl:
@@ -563,6 +602,9 @@ def gs08(c):
         return _gs(c)
     xs = [days(g["start"], g["issued"]) for g in gss_issued(c) if g["start"]]
     m = median(xs)
+    if not xs and any(c.inp(d["response"]) for d in disputes(c)):
+        return nodata(pick("Needs the received date of the disputes answered in this period: enter it on their batch in the tracker.",
+                           "يتطلب تاريخ استلام الاعتراضات التي تم الرد عليها في هذه الفترة: أدخله على الدفعة في السجل."))
     return R(num(m) if m is not None else "-", pick(f"days, median of {len(xs)}", f"يوم، الوسيط من {len(xs)}"), raw=m)
 
 
@@ -801,6 +843,9 @@ def gv03(c):
         return _gv(c)
     xs = [days(x["submitted"], x["approved"]) for x in c.get("F5")["deliverables"] if c.inp(x["approved"]) and x["submitted"]]
     m = median(xs)
+    if not xs and any(c.inp(d["response"]) for d in disputes(c)):
+        return nodata(pick("Needs the received date of the disputes answered in this period: enter it on their batch in the tracker.",
+                           "يتطلب تاريخ استلام الاعتراضات التي تم الرد عليها في هذه الفترة: أدخله على الدفعة في السجل."))
     return R(num(m) if m is not None else "-", pick(f"days, median of {len(xs)}", f"يوم، الوسيط من {len(xs)}"), raw=m)
 
 
@@ -871,7 +916,7 @@ def months(data):
     if data.get("F2"):
         ms |= {g["issued"][:7] for g in data["F2"]["gss"] if g["issued"]}
     if data.get("F3"):
-        ms |= {d["received"][:7] for d in data["F3"]["disputes"]}
+        ms |= {(d["received"] or d["closed"])[:7] for d in data["F3"]["disputes"] if d["received"] or d["closed"]}
     if data.get("F5"):
         ms |= {x["due"][:7] for x in data["F5"]["deliverables"] if x["due"]}
     cur = dt.date.today().isoformat()[:7]

@@ -132,24 +132,38 @@ class AppTests(unittest.TestCase):
             self.assertAlmostEqual(kpi.compute("EX-02", c10)["raw"], 0.8)
 
     def test_05_disputes_template_upload(self):
-        wb = load_workbook(os.path.join(ROOT, "static", "downloads", "CNHI_Hospital_Disputes_Tracker_v0.1.xlsx"))
-        d = wb["Disputes"]
-        for col, v in zip("ABCDEFGHI", ["DSP-0001", dt.date(2026, 9, 3), "H1", "GlobeMed Saudi", "Claim", "1", "MRS-1", "Coding", 10000]):
-            d[f"{col}6"] = v
-        d["L6"], d["N6"], d["O6"], d["P6"], d["Q6"] = dt.date(2026, 9, 6), "Closed", dt.date(2026, 9, 9), "Partially maintained", 4000
-        tl = wb["Time Log"]
-        tl["A6"], tl["B6"], tl["C6"], tl["E6"], tl["F6"] = dt.date(2026, 9, 3), "Someone", "DSP-0001", 2.5, "Yes"
+        wb = load_workbook(os.path.join(ROOT, "static", "downloads", "CNHI_Hospital_Disputes_Tracker_v1.0.xlsx"))
+
+        def put(ws, row, values):                                   # columns found by header text (row 4)
+            cols = {c.value: c.column_letter for c in ws[4] if c.value}
+            for k, v in values.items():
+                ws[f"{cols[k]}{row}"] = v
+        put(wb["Batches"], 5, {"Batch ID": "B01", "Hospital": "H1", "Received date": dt.date(2026, 9, 3),
+                               "KPMG opinion date": dt.date(2026, 9, 6)})
+        base = {"Batch ID": "B01", "Hospital": "H1", "Pathway": "Claim", "Dispute theme": "Coding or billing"}
+        put(wb["Disputes"], 5, dict(base, **{"Dispute ID": "DSP-H1-001", "Claimed amount (SAR)": 10000,
+                                             "Approved amount (SAR)": 0, "KPMG position": "Partially accepted",
+                                             "Value to pay (SAR) - partial only": 6000}))
+        put(wb["Disputes"], 6, dict(base, **{"Dispute ID": "DSP-H1-002", "KPMG position": "Not accepted"}))
+        put(wb["Disputes"], 7, dict(base, **{"Dispute ID": "DSP-H1-003", "KPMG position": "Pending"}))
+        put(wb["Actions"], 6, {"Action ID": "A-0001", "Date": dt.date(2026, 9, 3), "Dispute ID": "DSP-H1-001",
+                               "Action type": "Clinical review", "Team member": "Someone", "Hours": 2.5,
+                               "Estimated? (backfilled)": "Yes"})
         bio = io.BytesIO()
-        wb.save(bio)
+        wb.save(bio)                                                # saved without recalculation: the parser derives
         r = self.upload("F3", bio.getvalue(), "disputes.xlsx")
         self.publish(r.headers["Location"])
         data = store.current()
-        self.assertEqual(len(data["F3"]["disputes"]), 1)                     # example row ignored
+        self.assertEqual(len(data["F3"]["disputes"]), 3)                     # example action row ignored
+        first = data["F3"]["disputes"][0]
+        self.assertEqual((first["received"], first["value"], first["maintained"]), ("2026-09-03", 10000, 4000))
+        self.assertIsNone(data["F3"]["disputes"][2]["closed"])                  # pending keeps no opinion date
         with A.app.test_request_context():
             from flask import g
             g.lang = "en"
             c = kpi.Ctx(data, "2026-09", "")
-            self.assertEqual(kpi.compute("EX-07", c)["raw"], 1)
+            self.assertEqual(kpi.compute("EX-07", c)["raw"], 2)
+            self.assertAlmostEqual(kpi.compute("EX-08", c)["raw"], 0.5)
             self.assertEqual(kpi.compute("HD-05", c)["raw"], 4000)
             self.assertEqual(kpi.compute("HD-07", c)["raw"], 2.5)
             self.assertEqual(kpi.compute("HD-06", c)["raw"], 1)               # Thu 3 Sep -> Sun 6 Sep: Fri and Sat excluded

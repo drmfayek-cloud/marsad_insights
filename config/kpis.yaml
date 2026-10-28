@@ -161,17 +161,17 @@ kpis:
   page: EX
   tier: 1
   placement: CFO page - headline tile
-  name_en: Hospital disputes closed
-  name_ar: اعتراضات المستشفيات المغلقة
-  def_en: Number of hospital disputes the team closed with a documented response in the period.
-  def_ar: عدد اعتراضات المستشفيات التي أغلقها الفريق برد موثق خلال الفترة.
-  formula: COUNT(disputes with closure date in period)
+  name_en: Hospital disputes answered
+  name_ar: اعتراضات المستشفيات التي صدر فيها رأي
+  def_en: Number of hospital disputes on which KPMG issued a documented opinion in the period.
+  def_ar: عدد اعتراضات المستشفيات التي أصدر فيها فريق KPMG رأيا موثقا خلال الفترة.
+  formula: COUNT(disputes with KPMG opinion date in period)
   unit: Count
-  date_basis: Dispute closure date
+  date_basis: KPMG opinion date
   counting_unit: Dispute
-  source: F3 Hospital disputes tracker (template v0.1, placeholder)
-  source_columns: 'Disputes: Closure date, Status'
-  status: Needs new source
+  source: F3 Hospital disputes tracker v1.0
+  source_columns: 'Disputes: KPMG opinion date (inherited from Batches), KPMG position'
+  status: Mapped
   refresh: Weekly
   owner: KPMG medical review lead
   target: '-'
@@ -183,19 +183,19 @@ kpis:
   placement: CFO page - secondary row
   name_en: Review position maintained in disputes
   name_ar: نسبة ثبات موقف المراجعة في الاعتراضات
-  def_en: Share of closed disputes in which the original review position was fully maintained.
-  def_ar: نسبة الاعتراضات المغلقة التي ثبت فيها موقف المراجعة الأصلي بالكامل.
-  formula: Closed disputes with outcome = Maintained / EX-07
+  def_en: Share of answered disputes in which KPMG did not accept the hospital's objection, so the rejection was maintained in full.
+  def_ar: نسبة الاعتراضات التي صدر فيها رأي ولم يقبل فيها فريق KPMG اعتراض المستشفى، فبقي الرفض كاملا.
+  formula: Disputes with KPMG position = Not accepted / EX-07
   unit: '%'
-  date_basis: Dispute closure date
+  date_basis: KPMG opinion date
   counting_unit: Dispute
-  source: F3 Hospital disputes tracker (template v0.1, placeholder)
-  source_columns: 'Disputes: Outcome, Closure date'
-  status: Needs new source
+  source: F3 Hospital disputes tracker v1.0
+  source_columns: 'Disputes: KPMG position, KPMG opinion date'
+  status: Mapped
   refresh: Weekly
   owner: KPMG medical review lead
   target: '-'
-  caveat: Supports evidence of review quality. Partial outcomes are shown in HD-04.
+  caveat: KPMG opinion, not CNHI's final decision (recorded separately in the tracker). Partial acceptances are shown in HD-04.
   decisions: D-06, D-10
 - id: EX-09
   page: EX
@@ -411,9 +411,9 @@ kpis:
   unit: Count
   date_basis: Dispute received date
   counting_unit: Dispute
-  source: F3 Hospital disputes tracker (template v0.1, placeholder)
-  source_columns: 'Disputes: Received date'
-  status: Needs new source
+  source: F3 Hospital disputes tracker v1.0
+  source_columns: 'Disputes: Received date (inherited from Batches)'
+  status: Mapped
   refresh: Weekly
   owner: KPMG medical review lead
   target: '-'
@@ -431,9 +431,9 @@ kpis:
   unit: Count
   date_basis: Dispute received date
   counting_unit: Dispute
-  source: F3 Hospital disputes tracker (template v0.1, placeholder)
+  source: F3 Hospital disputes tracker v1.0
   source_columns: 'Disputes: Received date, Status'
-  status: Needs new source
+  status: Mapped
   refresh: Weekly
   owner: KPMG medical review lead
   target: '-'
@@ -445,19 +445,19 @@ kpis:
   placement: Page
   name_en: Value disputed
   name_ar: القيمة محل الاعتراض
-  def_en: SAR value of findings that hospitals disputed in the period.
-  def_ar: القيمة بالريال للملاحظات التي اعترضت عليها المستشفيات خلال الفترة.
-  formula: SUM(value of disputed findings) by received date
+  def_en: 'SAR value under dispute in the period: claimed amount less the amount approved by the TPA.'
+  def_ar: 'القيمة بالريال محل الاعتراض خلال الفترة: المبلغ المطالب به مطروحا منه المبلغ المعتمد من شركة إدارة المطالبات.'
+  formula: SUM(Claimed amount - Approved amount) by received date
   unit: SAR
   date_basis: Dispute received date
   counting_unit: Dispute
-  source: F3 Hospital disputes tracker (template v0.1, placeholder)
-  source_columns: 'Disputes: Value disputed (SAR)'
-  status: Needs new source
+  source: F3 Hospital disputes tracker v1.0
+  source_columns: 'Disputes: Claimed amount, Approved amount, Amount disputed (SAR)'
+  status: Mapped
   refresh: Weekly
   owner: KPMG medical review lead
   target: '-'
-  caveat: Value as stated in the original finding, not the hospital's claim.
+  caveat: Shown as partial until the approved amount is entered for every dispute (taken from NPHIES).
   decisions: D-05
 - id: HD-04
   page: HD
@@ -469,15 +469,15 @@ kpis:
   def_ar: 'توزيع الاعتراضات المغلقة حسب النتيجة: ثبات الموقف، أو ثبات جزئي، أو إلغاء الملاحظة، أو سحب الاعتراض، عددا وقيمة.'
   formula: COUNT and SUM(value) of closed disputes grouped by outcome
   unit: Count / SAR
-  date_basis: Dispute closure date
+  date_basis: KPMG opinion date
   counting_unit: Dispute
-  source: F3 Hospital disputes tracker (template v0.1, placeholder)
+  source: F3 Hospital disputes tracker v1.0
   source_columns: 'Disputes: Outcome, Value disputed'
-  status: Needs new source
+  status: Mapped
   refresh: Weekly
   owner: KPMG medical review lead
   target: '-'
-  caveat: Outcome categories to fix in D-06.
+  caveat: Outcome follows the KPMG position (Not accepted = Maintained, Partially accepted = Partially maintained, Accepted = Reversed).
   decisions: D-06
 - id: HD-05
   page: HD
@@ -489,11 +489,11 @@ kpis:
   def_ar: القيمة بالريال للملاحظات محل الاعتراض التي حافظت على صحتها بعد رد الفريق.
   formula: SUM(value, outcome = Maintained) + SUM(maintained portion, outcome = Partially maintained)
   unit: SAR
-  date_basis: Dispute closure date
+  date_basis: KPMG opinion date
   counting_unit: Dispute
-  source: F3 Hospital disputes tracker (template v0.1, placeholder)
+  source: F3 Hospital disputes tracker v1.0
   source_columns: 'Disputes: Value maintained (SAR), Outcome'
-  status: Needs new source
+  status: Mapped
   refresh: Weekly
   owner: KPMG medical review lead
   target: '-'
@@ -511,9 +511,9 @@ kpis:
   unit: Days
   date_basis: Dispute response date
   counting_unit: Dispute
-  source: F3 Hospital disputes tracker (template v0.1, placeholder)
+  source: F3 Hospital disputes tracker v1.0
   source_columns: 'Disputes: Received date, Response date'
-  status: Needs new source
+  status: Mapped
   refresh: Weekly
   owner: KPMG medical review lead
   target: Response standard to confirm with CNHI
@@ -531,13 +531,13 @@ kpis:
   unit: Hours / %
   date_basis: Work date
   counting_unit: Hour
-  source: F3 Hospital disputes tracker (template v0.1, placeholder)
-  source_columns: 'Time Log: Date, Hours, Dispute ID / activity'
-  status: Needs new source
+  source: F3 Hospital disputes tracker v1.0
+  source_columns: 'Actions: Date, Hours, Dispute ID, Action type'
+  status: Mapped
   refresh: Weekly
   owner: KPMG engagement manager
   target: '-'
-  caveat: Visible to CNHI (D-15). Logged in the tracker's Time Log from October 2026.
+  caveat: Visible to CNHI (D-15). Logged in the tracker's Actions sheet from October 2026; earlier effort can be backfilled and marked as estimated.
   decisions: D-15
 - id: GS-01
   page: GS
