@@ -1,48 +1,56 @@
 {% extends "base.html" %}
-{% block title %}{{ t('data') }}{% endblock %}
+{% block title %}{{ pick('Upload', 'تحميل') }}{% endblock %}
 {% block content %}
-<div class="pagehead"><div><h1>{{ t('data') }}</h1>
-  <div class="sub">{{ pick('Upload a workbook, check the preview, then publish. The workbook itself is not kept: only de-identified figures are stored.',
-                           'حمل المصنف وراجع المعاينة ثم انشر. لا يحتفظ النظام بالمصنف نفسه، بل بالأرقام بعد إزالة الهوية فقط.') }}</div></div></div>
+<div class="pagehead"><div><h1>{{ pick('Upload', 'تحميل') }}</h1>
+  <div class="sub">{{ pick('One place for every file. A register workbook is recognised automatically and updates the dashboard after you check the preview and publish; it is not kept. Any other PDF, Word or Excel file is saved as a document.',
+                           'مكان واحد لكل الملفات. يتعرف النظام على مصنفات السجلات تلقائيا وتحدّث اللوحة بعد المعاينة والنشر، ولا يحتفظ بها. أي ملف PDF أو Word أو Excel آخر يحفظ كمستند.') }}</div></div></div>
+{% if config.DEMO %}<div class="flash error">{{ pick('Demo system: do not upload real CNHI files.', 'نظام تجريبي: لا تحمّل ملفات حقيقية للمركز.') }}</div>{% endif %}
 <div class="grid">
-<div class="card wide">
-  <h3>{{ pick('Upload', 'تحميل') }}</h3>
-  <form method="post" enctype="multipart/form-data" class="uploadform">
+<div class="card wide docform">
+  <form method="post" enctype="multipart/form-data">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-    <label>{{ pick('Workbook', 'المصنف') }}
-      <select name="kind" required>{% for k, v in KINDS.items() %}<option value="{{ k }}">{{ k }} · {{ pick(v, KINDS_AR[k]) }}</option>{% endfor %}</select></label>
-    <label>{{ pick('File (.xlsx or .xlsm, up to 40 MB)', 'الملف (.xlsx أو .xlsm حتى 40 ميغابايت)') }}<input type="file" name="file" accept=".xlsx,.xlsm" required></label>
-    <label>{{ pick('Quarter, accounting report only (e.g. 2026-Q1; read from the sheet names if blank)', 'الربع، للتقرير المحاسبي فقط') }}<input name="label" placeholder="2026-Q1" pattern="\d{4}-Q[1-4]"></label>
-    <button class="btn primary">{{ pick('Upload and preview', 'تحميل ومعاينة') }}</button>
+    {% if parent %}<input type="hidden" name="parent" value="{{ parent.id }}">
+      <p><b>{{ pick('New version of', 'نسخة جديدة من') }}</b> “{{ parent.title }}”</p>{% endif %}
+    <label>{{ pick('File: Excel (.xlsx, .xlsm), Word (.docx) or PDF, up to 25 MB for documents', 'الملف: Excel أو Word (.docx) أو PDF، حتى 25 ميغابايت للمستندات') }}
+      <input type="file" name="file" accept=".xlsx,.xlsm,.docx,.pdf" required></label>
+    <div class="small muted">{{ pick('Registers recognised:', 'السجلات المعروفة:') }}
+      {% for k, v in RKINDS.items() %}<span class="linkchip">{{ pick(v, RKINDS_AR[k]) }}</span>{% endfor %}</div>
+    {% if admin %}<label>{{ pick('Quarter, accounting report only (e.g. 2026-Q1; read from the sheet names if blank)', 'الربع، للتقرير المحاسبي فقط (مثل 2026-Q1)') }}
+      <input name="label" placeholder="2026-Q1" pattern="\d{4}-Q[1-4]"></label>{% endif %}
+    <details class="docdetails" {{ 'open' if open_doc }}>
+      <summary>{{ pick('If this is a document (report, minutes, letter, evidence): category, who can see it, links', 'إذا كان مستندا (تقرير، محضر، خطاب، دليل): الفئة، من يطلع عليه، الروابط') }}</summary>
+      {% set v = pre %}{% set cat_optional = True %}
+      {% include "_doc_fields.html" %}
+      <label class="inline confirm"><input type="checkbox" name="confirm" value="1"><span>
+        {{ pick('I confirm this file holds no patient identifiers (names, national ID or iqama numbers). Tick only if the upload is refused for a false match or a scanned file; it is recorded in the audit log.',
+                'أؤكد أن الملف لا يحتوي على بيانات تعريف المرضى. اختر ذلك فقط إذا رُفض التحميل لتطابق خاطئ أو لملف ممسوح ضوئيا؛ يسجل ذلك في سجل التدقيق.') }}</span></label>
+      <p class="small muted">{{ pick('Left blank, the category is guessed from the file name and the document is visible to KPMG only.', 'إذا تركت فارغة، تُستنتج الفئة من اسم الملف ويكون المستند متاحا لفريق KPMG فقط.') }}</p>
+    </details>
+    <button class="btn primary">{{ pick('Upload', 'تحميل') }}</button>
   </form>
-  <p class="small muted">{{ pick('Templates:', 'النماذج:') }} <a href="{{ url_for('governance_xlsx') }}">{{ pick('Project delivery register (F5)', 'سجل إنجاز المشروع (F5)') }}</a> ·
-    <a href="{{ url_for('corrective_xlsx') }}">{{ pick('Governance & corrective-action register (F6)', 'سجل الحوكمة والإجراءات التصحيحية (F6)') }}</a> ·
-    <a href="{{ url_for('static', filename='downloads/CNHI_Hospital_Disputes_Tracker_v1.0.xlsx') }}">{{ pick('Hospital disputes tracker (F3)', 'سجل الاعتراضات (F3)') }}</a></p>
+  {% if admin %}<p class="small muted">{{ pick('Templates:', 'النماذج:') }}
+    <a href="{{ url_for('governance_xlsx') }}">{{ pick('Project delivery register', 'سجل إنجاز المشروع') }}</a> ·
+    <a href="{{ url_for('corrective_xlsx') }}">{{ pick('Governance register (policy changes and CNHI decisions)', 'سجل الحوكمة (تحديث السياسات وقرارات المركز)') }}</a> ·
+    <a href="{{ url_for('static', filename='downloads/CNHI_Hospital_Disputes_Tracker_v1.0.xlsx') }}">{{ pick('Hospital disputes tracker', 'سجل الاعتراضات') }}</a></p>{% endif %}
 </div>
-{% if cand %}
-<div class="card wide t-amber">
-  <h3>{{ pick('F6 candidates', 'المرشحات لسجل F6') }}</h3>
-  <p>{{ pick(cand.dec ~ ' decision candidates and ' ~ cand.act ~ ' action candidates from the published daily register, GSS workbook and disputes tracker; ' ~ cand.skipped ~ ' already in the register were left out.',
-             cand.dec ~ ' قرار مرشح و' ~ cand.act ~ ' إجراء مرشح من الملفات المنشورة؛ واستبعد ' ~ cand.skipped ~ ' موجودة في السجل.') }}</p>
-  <p><a class="btn primary" href="{{ url_for('candidates_xlsx') }}">{{ pick('Download F6 candidates (KPMG internal)', 'تنزيل المرشحات (داخلي لفريق KPMG)') }}</a>
-     <span class="small muted">{{ pick('Review the rows and copy the ones CNHI should consider into the F6 register. The file can contain provider names.', 'راجع الصفوف وانسخ المناسب منها إلى سجل F6. قد يحتوي الملف على أسماء مقدمي الخدمة.') }}</span></p>
-</div>
-{% endif %}
+{% if admin %}
 <div class="card wide">
-  <h3>{{ pick('Published versions', 'النسخ المنشورة') }}</h3>
-  <table class="t"><thead><tr><th>{{ pick('Workbook', 'المصنف') }}</th><th>{{ pick('Version', 'النسخة') }}</th><th>{{ pick('File', 'الملف') }}</th><th>{{ pick('Published', 'تاريخ النشر') }}</th></tr></thead><tbody>
-  {% for k, v in KINDS.items() %}{% set u = current.get(k) %}
-    <tr><td>{{ k }} · {{ pick(v, KINDS_AR[k]) }}</td>
+  <h3>{{ pick('Registers in use', 'السجلات المستخدمة') }}</h3>
+  <table class="t"><thead><tr><th>{{ pick('Register', 'السجل') }}</th><th>{{ pick('Version', 'النسخة') }}</th><th>{{ pick('File', 'الملف') }}</th><th>{{ pick('Published', 'تاريخ النشر') }}</th></tr></thead><tbody>
+  {% for k, v in RKINDS.items() %}{% set u = current.get(k) %}
+    <tr><td>{{ pick(v, RKINDS_AR[k]) }}</td>
       {% if u %}<td><a href="{{ url_for('data_view', uid=u.id) }}">#{{ u.id }}</a></td><td>{{ u.filename }}{% if u.label %} ({{ u.label }}){% endif %}</td><td>{{ u.published_at[:16] }}</td>
       {% else %}<td colspan="3" class="muted">{{ pick('Not published yet', 'لم ينشر بعد') }}</td>{% endif %}</tr>
   {% endfor %}</tbody></table>
 </div>
 <div class="card wide">
   <h3>{{ pick('Upload history', 'سجل التحميل') }}</h3>
-  <div class="tablewrap"><table class="t"><thead><tr><th>#</th><th>{{ pick('Workbook', 'المصنف') }}</th><th>{{ pick('File', 'الملف') }}</th><th>{{ pick('Status', 'الحالة') }}</th><th>{{ pick('Uploaded', 'التحميل') }}</th><th>{{ pick('By', 'بواسطة') }}</th></tr></thead><tbody>
-  {% for u in uploads %}<tr><td><a href="{{ url_for('data_view', uid=u.id) }}">#{{ u.id }}</a></td><td>{{ u.kind }}</td><td>{{ u.filename }}{% if u.label %} ({{ u.label }}){% endif %}</td>
+  <div class="tablewrap"><table class="t"><thead><tr><th>#</th><th>{{ pick('Register', 'السجل') }}</th><th>{{ pick('File', 'الملف') }}</th><th>{{ pick('Status', 'الحالة') }}</th><th>{{ pick('Uploaded', 'التحميل') }}</th><th>{{ pick('By', 'بواسطة') }}</th></tr></thead><tbody>
+  {% for u in uploads %}<tr><td><a href="{{ url_for('data_view', uid=u.id) }}">#{{ u.id }}</a></td><td>{{ pick(RKINDS[u.kind], RKINDS_AR[u.kind]) }}</td><td>{{ u.filename }}{% if u.label %} ({{ u.label }}){% endif %}</td>
     <td><span class="badge {{ 'ok' if u.status == 'published' else 'warn' if u.status == 'staged' else '' }}">{{ u.status }}</span></td><td>{{ u.created_at[:16] }}</td><td>{{ u.created_by }}</td></tr>
   {% else %}<tr><td colspan="6" class="muted">-</td></tr>{% endfor %}</tbody></table></div>
+  <p class="small"><a href="{{ url_for('documents') }}">{{ pick('Documents saved from this page are in Documents.', 'المستندات المحفوظة من هذه الصفحة في المستندات.') }}</a></p>
 </div>
+{% endif %}
 </div>
 {% endblock %}

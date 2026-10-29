@@ -5,8 +5,8 @@ Unlike the six registers (read, then deleted), a library file is kept: it is the
 Safeguards, applied at upload:
   - types: .pdf, .docx, .xlsx, .xlsm only, checked by content (signature), not by name; legacy .doc/.xls are refused
     because their content cannot be checked;
-  - patient identifiers: the text is scanned for 10-digit numbers starting with 1 or 2 (national ID / iqama format) and for
-    patient-identifier labels. A match, or a file with no readable text (a scan), is refused unless the uploader confirms the
+  - patient identifiers: the text is scanned for 10-digit numbers starting with 1 or 2 (national ID / iqama format)
+    and for patient-identifier labels. A match, or a file with no readable text (a scan), is refused unless the uploader confirms the
     file holds no patient identifiers; the confirmation is written to the audit log. Matches are counted, never stored;
   - visibility per document: 'kpmg' (KPMG users only) or 'shared' (also CNHI users);
   - files are served only as downloads to signed-in users allowed to see them, and every download is audited.
@@ -126,6 +126,18 @@ def id_check(text):
     return ("ids_found", n) if n else ("clean", 0)
 
 
+GUESS = [("minutes", ("minute", "محضر", "mom", "mmr")), ("memo", ("memo", "مذكرة", "decision", "قرار")),
+         ("evidence", ("evidence", "deduction", "credit note", "دليل", "خصم")), ("letter", ("letter", "خطاب", "مراسلة", "reply")),
+         ("objection", ("objection", "اعتراض", "dispute")), ("opinion", ("opinion", "رأي")),
+         ("monthly", ("monthly", "شهري")), ("quarterly", ("quarter", "ربع")), ("annual", ("annual", "سنوي")), ("gss", ("gss",)),
+         ("policy", ("policy", "manual", "circular", "سياسة", "دليل إجرائي", "تعميم"))]
+
+
+def guess_category(filename):
+    n = (filename or "").lower()
+    return next((cat for cat, words in GUESS if any(w in n for w in words)), "other")
+
+
 def save(raw, filename, meta, user, confirm=False, parent=None):
     """Validate and store a document; returns its id. meta: title, category, period, description, visibility, links."""
     ext = os.path.splitext(filename or "")[1].lower()
@@ -188,12 +200,25 @@ def get(doc_id, internal):
     return d
 
 
-def search(internal, q="", category="", kind="", ref="", period=""):
+GROUPS = {   # page shortcuts: a document belongs to a group by its category or by a link
+    "decisions": (("minutes", "memo"), "decision"),
+    "deliverables": (("monthly", "quarterly", "annual", "gss"), "deliverable"),
+    "disputes": (("objection", "opinion"), "batch"),
+    "actions": (("evidence", "letter"), "action"),
+}
+
+
+def search(internal, q="", category="", kind="", ref="", period="", group=""):
     sql = "SELECT d.* FROM documents d WHERE " + visible_sql(internal).replace("status", "d.status").replace("visibility", "d.visibility")
     args = []
     if category:
         sql += " AND d.category=?"
         args.append(category)
+    if group in GROUPS:
+        cats, lk = GROUPS[group]
+        sql += (" AND (d.category IN (" + ",".join("?" * len(cats)) + ") OR EXISTS (SELECT 1 FROM doc_links l "
+                "WHERE l.doc_id=d.id AND l.kind=?))")
+        args += list(cats) + [lk]
     if period:
         sql += " AND d.period=?"
         args.append(period)
@@ -252,8 +277,9 @@ def link_options(data):
     """Choices for the link fields, built from the published registers."""
     opts = {k: [] for k in LINK_KINDS}
     f6 = data.get("F6") or {}
-    for a in f6.get("actions", []):
-        opts["action"].append((a["id"], f"{a['id']} · {a['type']} · {a['target'] or 'Provider (not named)'}"))
+    from . import actions
+    for a in sorted(actions.derive(data), key=lambda x: x["id"], reverse=True)[:400]:
+        opts["action"].append((a["id"], f"{a['id']} · {a['target'] or 'Provider (not named)'}"))
     for d in f6.get("decisions", []):
         opts["decision"].append((d["id"], f"{d['id']} · {d['topic']} · {d['decision']}" + (f" · {d['minutes']}" if d.get("minutes") else "")))
     for x in (data.get("F5") or {}).get("deliverables", []):

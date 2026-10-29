@@ -1,6 +1,6 @@
 # MARSAD Insights: deployment and operating guide
 
-Version 1.7 · 29 October 2026 · KPI dictionary v0.6 · disputes tracker v1.0
+Version 1.8 · 29 October 2026 · KPI dictionary v0.7 · disputes tracker v1.0
 
 MARSAD Insights is the stakeholder dashboard for the CNHI audit and approval project. It is a separate application from MARSAD live, with its own link and user list. You keep working in your Excel workbooks; you upload them to the dashboard, it checks them, and you publish. The dashboard then shows the 74 KPIs on eight bilingual pages (English and Arabic).
 
@@ -139,16 +139,18 @@ Data and users stay in the volume. Database changes apply automatically on start
 ## 5. Setting up the dashboard (Administrator)
 
 1. **Add users** (Administration → Users). Each user gets a temporary password, shown once; send it through a separate channel. Users set up MFA and change the password at first sign-in.
-2. **Upload the workbooks** (Administration → Data uploads), in this order:
+2. **Upload** (the **Upload** button in the header). One page for every file: choose the file and press Upload. The dashboard recognises a register from its sheets, so there is no type to choose:
 
-| Code | Workbook | Feeds |
+| Register | Recognised by | Feeds |
 |---|---|---|
-| F1 | MARSAD Daily Record & Action Tracker (.xlsm) | Executive, daily review, FWA pages |
-| F2 | MARSAD GSS Assurance Workbook (.xlsm) | GSS page and the claims headline (EX-05, EX-09) |
-| F4 | Quarterly accounting report (.xlsx). Enter the quarter (for example `2026-Q1`) if the sheet names do not show it. | Financial page |
-| F3 | CNHI Hospital Disputes Tracker v1.0 (blank copy on the upload page; see section 7a) | Disputes page, EX-07 and EX-08 |
-| F5 | Project delivery register (template on the upload page) | KPMG delivery & effort page, EX-10 |
-| F6 | Governance & corrective-action register (template on the upload page; see 7c) | Governance & corrective actions page, EX-11, FW-08 |
+| MARSAD Daily Record & Action Tracker (.xlsm) | Daily Intake and Daily Log sheets | Executive, daily review, FWA pages, and most corrective actions |
+| MARSAD GSS Assurance Workbook (.xlsm) | GSS Register and Sample Register sheets | GSS page, claims headline (EX-05, EX-09), GSS corrective actions |
+| CNHI Hospital Disputes Tracker v1.0 | Disputes sheet with Batches (or Actions) | Disputes page, EX-07, EX-08, dispute corrective actions |
+| Quarterly accounting report (.xlsx). Enter the quarter (for example `2026-Q1`) if the sheet names do not show it. | Its claims sheet (مطالبات الربع) | Financial page |
+| Project delivery register | Deliverables sheet | KPMG delivery & effort page, EX-10 |
+| Governance register (policy changes and CNHI decisions) | Decisions or Policy & recommendations sheet | Governance page GC-01 to GC-03, FW-08 |
+
+Any other file (a PDF, a Word document, an Excel file that is not a register) is saved as a **document**: open "If this is a document" on the same page to choose its category, who can see it and its links (see 7d). Registers are published by the administrator; KPMG viewers can upload documents.
 
 3. **Check the preview** after each upload. It shows what was read and lists any problems, such as a skipped row, an unknown flag code or a missing optional column. Then press **Publish**. To go back, open an older upload and press **Roll back to this version**.
 4. **Close a month** (Administration → Close a month) when CNHI approves that month's report. Its figures are then frozen and marked **Approved**. The current month stays **Provisional**. Reopen a month only to restate it, and record why in the note.
@@ -163,7 +165,7 @@ Data and users stay in the volume. Database changes apply automatically on start
 | Weekly, and after each opinion batch | Update and upload the disputes tracker (F3) | 1 minute |
 | As documents are issued | Add reports, minutes, evidence and objection files to the documents library, linked and with the right visibility | 1 minute each |
 | Monthly | Update the project delivery register (F5), including Team effort and CNHI requests, and upload it; close the month once CNHI approves the report | 10 minutes |
-| After each CNHI decision meeting | Update the governance & corrective-action register (F6) from the minutes and upload it | 10 minutes |
+| After each CNHI decision meeting | Upload the minutes (they appear on the Governance page) and update the governance register's Decisions sheet, then upload it | 10 minutes |
 | Quarterly | Upload the accounting report (F4) | 2 minutes |
 
 Everything else is calculated: de-identification, KPIs, charts, both languages.
@@ -245,72 +247,49 @@ FTE equivalent = person-days ÷ working days in the month (Sunday to Thursday; h
 
 ---
 
-## 7c. Governance & corrective actions page (F6)
+## 7c. Governance & corrective actions page
 
-Governance here means the loop from findings to change: **finding → recommendation or escalation → CNHI decision → corrective action on a TPA or provider, or a policy or manual change → completed → effect on later findings**. KPMG keeps the register from CNHI decision minutes and records the minutes reference of every decision.
+Governance here means the loop from findings to change: **finding → CNHI decision → corrective action on a TPA or provider, or a policy or manual change → completed → effect on later findings**.
 
-| Sheet | One row per | Key fields |
+### Corrective actions come from the registers (decision D-25)
+
+Nothing is typed into a separate corrective-action register, and nothing is downloaded and uploaded again. Each time a register is published, the actions are rebuilt from it:
+
+| Register | One corrective action is | Closed when |
 |---|---|---|
-| Policy & recommendations | Recommendation to CNHI (policy or manual, contract or pricing, process, system or control) | Document affected, source (flag, GSS report, dispute, financial review, trend), stage (Proposed → Under CNHI review → Approved → Issued, or Rejected / Withdrawn) with the date of each stage |
-| Decisions | Item submitted to CNHI for a decision | Subject (TPA, provider, policy), topic, value at stake, forum, decision, decision date, minutes reference |
-| Corrective actions | Action on a TPA or a provider | Decision ID, action type, flag code, opened / due / completed dates, status, value agreed for recovery, value recovered |
+| Daily register, Daily Log | The confirmed flags of one TPA (or one provider, when the Action level is aimed at a provider) for one flag family and month | Every flag has a Date closed (or a closing Status such as Closed or Resolved) |
+| GSS workbook, Sample Register | The flagged claims of one GSS report | Every flag status reads Closed |
+| Disputes tracker | The disputes of one hospital with one fraud, waste or abuse indicator | CNHI's final decision is recorded for each |
 
-**Provider names (decision D-23).** TPAs are always named. A provider is named only when its decision is Approved (or Approved with changes) and the action is not a referral for investigation. Otherwise the upload discards the name, so it is never stored, and the provider is counted as "Not named". Referrals for investigation appear as counts only. The upload preview shows how many names were withheld.
+Provider actions from the Daily Log are limited to the 10 largest per month (at least 3 flags or SAR 100,000), plus every one escalated to CNHI; the limits are in `config/settings.yaml`.
 
-| KPI | Shows |
-|---|---|
-| GC-01 | Recommendations by stage and type; changes issued in the period |
-| GC-02 | Median days from proposal to CNHI approval, and from approval to issue; age of items awaiting a decision |
-| GC-03 | CNHI decisions: decided, outcome mix, pending, median days to decision, value at stake by topic |
-| GC-04 | Corrective actions on TPAs: open, overdue, opened and completed, by TPA |
-| GC-05 | TPA actions completed by their due date |
-| GC-06 | Corrective actions on providers by type; referrals (counts only); providers with repeat actions |
-| GC-07 | SAR recovered against SAR agreed, cumulative (the 'recovered' stage: actual cash, unlike identified values elsewhere) |
-| GC-08 | For completed actions with a flag code: the same finding for the same TPA or provider, 90 days before against 90 days after. Needs 30 days of review data on each side. An indicator, not proof. |
-| GC-09 | Corrective-action status: count by status, age of open actions, stale-register warning |
-| EX-11 | CFO page: corrective actions open, overdue, due soon and completed |
+**What the team must keep up to date in the Daily Log**, because the status depends on it: **Due date**, **Status** and **Date closed** when a flag is resolved, and **Evidence reference** for the proof. Add a **Recovered (SAR)** column to record money recovered on evidence (GC-07). Until Status and Date closed are filled consistently, the tracker will show more actions overdue than is really the case.
 
-### Corrective-action status (decision D-24)
-
-Status is calculated from the dates, never typed, and the same rule drives every tile, the tracker and the download:
+### Status (decision D-24)
 
 | Status | Rule |
 |---|---|
-| Not started | No opened date yet |
-| On track | Open, due in more than 7 days |
-| Due soon | Open, due within 7 days |
-| Overdue | Open and past the due date |
-| Completed - evidence pending | Completed date, no evidence reference |
-| Completed - verified | Completed date and evidence reference |
-| Cancelled | Status column = Cancelled (kept for the audit trail) |
+| Overdue | An open item is past its due date (the Items column shows how many) |
+| Due soon | The earliest open due date is within 7 days |
+| On track | Open, due later (or no due date recorded) |
+| Completed - evidence pending | Every item closed, some without an evidence reference |
+| Completed - verified | Every item closed with evidence (GSS closures and CNHI decisions count as evidence) |
 
-A red warning shows on the Governance page, the tracker and the CFO tile when the register has not been uploaded for more than 7 days. Thresholds are in `config/settings.yaml` (`corrective_actions`).
+A red warning shows when the daily register has not been uploaded for more than 7 days.
 
-**Action tracker** (Governance page → Open the action tracker), for every signed-in user:
-- status strip with counts (click to filter), age of open actions, filters for as-at date, TPA, target and action type;
-- one row per action: status, change since the previous upload ("was Overdue", "New since last upload"), target, decision and minutes reference, due date and days overdue, owner, recovery, status note;
-- action page: timeline from submission to evidence, recovery progress, and status at each published version of the register;
-- **Download Excel** (the filtered view, English and Arabic headers, stamped with the as-at date) and **Print or save as PDF** (A4 landscape). Every download is written to the audit log.
-- Choose "End of <month>" for a closed month: the tracker then uses the register version current when the month was closed, so it shows the approved month-end position.
+**Action tracker** (Governance page → Open the action tracker), for every signed-in user: opens on the open actions; filters for as-at date, register, TPA, target and issue; for each action the items closed and past due, due date, owner, amount at risk, escalation and CNHI response, and what changed at the last upload. The action page shows the timeline, linked documents and the status recorded at each upload. **Download Excel** and **Print or save as PDF** export the filtered view; downloads are audited. Choose "End of <month>" for a closed month to see the approved month-end position.
 
-**F6 candidates** (Data uploads page, administrators only): an Excel file in the register's column order with decision candidates (daily-register TPA-level flags grouped by TPA, flag code and month, the 5 largest per TPA and month worth at least SAR 100,000; Unsatisfactory GSS reports; disputes with a fraud, waste or abuse indicator) and action candidates (flags CNHI endorsed for routing to the TPA). Copy the rows CNHI should consider into F6 and keep their Source reference, so they are not offered again. The file can contain provider names: keep it internal. Recoveries are not suggested from the quarterly accounting report, which has no reference linking a deduction to an action.
+Provider names follow D-23: named only once CNHI has endorsed or decided the case; referrals for investigation (disputes with a 'Suspected' indicator) are never named.
 
-### Operating the register
+### Policy changes and CNHI decisions (governance register, F6)
 
-| When | Who | What |
-|---|---|---|
-| Within 2 working days of an event (report submitted, minutes received, letter in) | KPMG register maintainer (one named person) | Add or update the row; every row has a source reference |
-| Weekly project meeting | Maintainer, with the engagement manager | Review due-soon and overdue actions, chase owners, download candidates, upload F6 (with F3) |
-| Monthly management review, before month close | CNHI counterpart confirms; engagement manager closes the month | Confirm the decision log and action statuses with CNHI |
-| Quarterly | Finance consultant; medical review lead | Reconcile recovered amounts with the accounting report; review GC-08 effect |
-
-Rules: no row without a source reference; Completed and Value recovered only on evidence; IDs never reused; cancelled actions stay in the file. The Excel file holds provider names: keep it in the restricted engagement folder.
+What is not in the daily registers sits in one small workbook (template on the Upload page): **Policy & recommendations** (stage and dates of each recommended change) and **Decisions** (item, outcome, date, minutes reference). It feeds GC-01 to GC-03 and FW-08. The minutes themselves are uploaded as documents (category "CNHI minutes", guessed from a file name containing "minutes" or "محضر") and listed on the Governance page.
 
 ---
 
 ## 7d. Documents library (1.7)
 
-**Documents** button in the header, for every signed-in user. KPMG users (administrator and KPMG viewer) upload; CNHI users see and download the documents shared with them.
+Documents are uploaded on the same **Upload** page as the registers (open "If this is a document"); the **Documents** button in the header lists and searches them. KPMG users (administrator and KPMG viewer) upload; CNHI users see and download the documents shared with them. Left blank, the category is guessed from the file name and the document is visible to KPMG only.
 
 | Field | Use |
 |---|---|
@@ -322,11 +301,11 @@ Rules: no row without a source reference; Completed and Value recovered only on 
 
 Checks at upload:
 - the content must really be the claimed type (a renamed file is refused);
-- the text is scanned for patient identifiers: 10-digit numbers starting with 1 or 2 (national ID and iqama format) and labels such as "patient name" or "رقم الهوية". A file with a match, or with no readable text (a scanned PDF), is refused unless the uploader ticks the confirmation that it holds no patient identifiers. The confirmation is written to the audit log. Matches are counted, never stored.
+- the text is scanned for patient identifiers: 10-digit numbers starting with 1 or 2 (national ID and iqama format; round amounts ending in 000 are ignored) and labels such as "patient name" or "رقم الهوية". A file with a match, or with no readable text (a scanned PDF), is refused unless the uploader ticks the confirmation that it holds no patient identifiers. The confirmation is written to the audit log. Matches are counted, never stored.
 
 Where documents appear:
 - the action page lists the documents linked to the action and to its decision, with **Add evidence or correspondence**; the tracker shows a paperclip with the count;
-- the Governance, Delivery and Disputes pages link to minutes and decisions, deliverable documents, and objection files and opinions;
+- the Governance, Delivery and Disputes pages list the latest minutes and decision documents, deliverable documents, and objection files and opinions, by their category (no link needed);
 - search covers the title, file name and the text inside the file.
 
 **New version** keeps the history: the earlier file stays available from the document page, marked "Earlier version", and the list shows the current one. **Delete** (administrator only) removes the file and its versions for good.
@@ -335,7 +314,7 @@ A linked evidence document does not change an action's status by itself: the reg
 
 Storage: files sit in the data volume (`/data/library`) and are included in the nightly backup (`deploy/backup.sh`). Plan disk space accordingly (the 50 GB in 4.1 is ample for several thousand reports). On the Render preview the library is emptied at every restart: do not upload real documents there.
 
-**Phase 2 - extraction (not built yet, needs approval).** Reading figures or register rows out of Word and PDF files needs an AI service called from the server, which sends CNHI content outside it. Before it is switched on: KPMG Risk and CNHI information-security approval, an in-Kingdom or approved endpoint, and a review step in which a person accepts each extracted row (as with the candidate list). Until then, extraction is done on request in a Claude session, with the result checked before it goes into the registers.
+**Phase 2 - extraction (not built yet, needs approval).** Reading figures or register rows out of Word and PDF files needs an AI service called from the server, which sends CNHI content outside it. Before it is switched on: KPMG Risk and CNHI information-security approval, an in-Kingdom or approved endpoint, and a review step in which a person accepts each extracted row. Until then, extraction is done on request in a Claude session, with the result checked before it goes into the registers.
 
 ---
 
@@ -385,8 +364,7 @@ Decisions D-18 to D-21 are built as recommended: review coverage on the CFO page
 app.py                 routes: sign-in, pages, uploads, month close, users, audit
 insights/parsers.py    reads the six workbooks (columns found by header name)
 insights/kpi.py        the 74 KPI calculations
-insights/actions.py    corrective-action status rules, tracker, history and Excel download
-insights/candidates.py F6 candidate list built from F1-F3
+insights/actions.py    corrective actions built from F1-F3, status rules, status log, tracker and Excel download
 insights/library.py    documents library: type and identifier checks, storage, versions, visibility, links
 insights/samplefiles.py small PDF and Word builders (demo library and tests)
 insights/deid.py       hashing and pseudonyms

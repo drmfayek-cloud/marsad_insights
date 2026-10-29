@@ -6,7 +6,7 @@ Kinds:
   F3 hospital disputes tracker
   F4 quarterly accounting report
   F5 project delivery register (deliverables, meetings, knowledge transfer, team effort, CNHI requests, contract)
-  F6 governance & corrective-action register (recommendations, CNHI decisions, corrective actions)
+  F6 governance register (policy and manual changes, CNHI decisions); corrective actions are built from F1-F3
 """
 import gzip
 import json
@@ -20,7 +20,7 @@ KINDS = {
     "F3": "Hospital disputes tracker",
     "F4": "Quarterly accounting report",
     "F5": "Project delivery register",
-    "F6": "Governance & corrective-action register",
+    "F6": "Governance register (policy changes and CNHI decisions)",
 }
 KINDS_AR = {
     "F1": "سجل مرصد اليومي",
@@ -28,7 +28,7 @@ KINDS_AR = {
     "F3": "سجل اعتراضات المستشفيات",
     "F4": "التقرير المحاسبي الربعي",
     "F5": "سجل إنجاز المشروع",
-    "F6": "سجل الحوكمة والإجراءات التصحيحية",
+    "F6": "سجل الحوكمة (تحديث السياسات وقرارات المركز)",
 }
 DATA_DIR = None
 _cache = {}

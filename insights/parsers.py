@@ -179,7 +179,7 @@ def parse_f1(path):
     known = {c["code"] for c in codes}
     # daily log: one row per flag
     t = Table(find_sheet(wb, "Daily Log"), ["Log ID", "Reference no.", "Flag code", "Flag status"], max_col=60)
-    has = dict(shared_tpa=t.has("Shared with TPA on"), selection=t.has("Selection reason"),
+    has = dict(shared_tpa=t.has("Shared with TPA on"), selection=t.has("Selection reason"), recovered=t.has("Recovered (SAR)"),
                evidence=t.has("Evidence reference"), fwa=any(c["fwa"] for c in codes), root=any(c["root"] for c in codes),
                closed=False, cnhi=t.has("Sent to CNHI on"))
     flags, skipped, unknown = [], 0, set()
@@ -202,7 +202,8 @@ def parse_f1(path):
                  state=to_text(t.get(r, "Status")), closed=to_date(t.get(r, "Date closed")),
                  shared_tpa=to_date(t.get(r, "Shared with TPA on")), selection=to_text(t.get(r, "Selection reason")),
                  evidence=to_text(t.get(r, "Evidence reference")), sent_cnhi=to_date(t.get(r, "Sent to CNHI on")),
-                 cnhi_response=to_text(t.get(r, "CNHI response")), cnhi_status=to_text(t.get(r, "CNHI status")))
+                 cnhi_response=to_text(t.get(r, "CNHI response")), cnhi_status=to_text(t.get(r, "CNHI status")),
+                 recovered=to_num(t.get(r, "Recovered (SAR)")))
         flags.append(f)
     has["closed"] = any(f["closed"] for f in flags)
     if skipped:
@@ -338,7 +339,7 @@ def parse_f3(path):
             value=value, response=opinion, status=to_text(t.get(r, "Status")),
             closed=closed, outcome=outcome, maintained=kept,
             position=position, action=to_text(t.get(r, "Recommended action")), fwa=to_text(t.get(r, "FWA indicator")) or "None",
-            cnhi=to_text(t.get(r, "CNHI final decision"))))
+            cnhi=to_text(t.get(r, "CNHI final decision")), cnhi_date=to_date(t.get(r, "CNHI decision date"))))
     if no_date:
         warn.append(f"{no_date} dispute(s) have no received date (enter it on the batch); they are left out of monthly intake and ageing.")
     if no_amount:
@@ -588,14 +589,10 @@ def parse_f6(path):
         "subject": ("Subject name", "t"), "topic": ("Topic", "t"), "source": ("Source reference", "t"),
         "value": ("Value at stake (SAR)", "n"), "forum": ("Forum", "t"), "decision": ("Decision", "t"),
         "decided": ("Decision date", "d"), "minutes": ("Minutes reference", "t")})
-    raw_act = sheet_rows(wb, warn, "Corrective actions", ["Action ID", "Target type"], {
-        "id": ("Action ID", "t"), "decision_id": ("Decision ID", "t"), "target_type": ("Target type", "t"),
-        "target": ("Target name", "t"), "tpa": ("TPA", "t"), "type": ("Action type", "t"), "code": ("Flag code", "t"),
-        "source": ("Source reference", "t"), "opened": ("Opened date", "d"), "due": ("Due date", "d"),
-        "completed": ("Completed date", "d"), "status": ("Status", "t"),
-        "agreed": ("Value agreed for recovery (SAR)", "n"), "recovered": ("Value recovered (SAR)", "n"),
-        "evidence": ("Evidence reference", "t"), "owner": ("Action owner (unit)", "t"), "updated": ("Last update date", "d"),
-        "note": ("Status note (shown on dashboard)", "t")})
+    if find_sheet(wb, "Corrective actions", required=False) is not None:
+        warn.append("The 'Corrective actions' sheet is no longer read: corrective actions now come from the daily register, "
+                    "the GSS workbook and the disputes tracker.")
+    raw_act = []
     withheld = 0
     decisions = []
     for d in raw_dec:
@@ -647,14 +644,36 @@ def parse_f6(path):
             warn.append(f"Action {a['id']}: completed without an evidence reference; shown as 'Completed - evidence pending'.")
         actions.append(a)
     summary = {"Recommendations": len(recs), "Decisions": len(decisions),
-               "Corrective actions": len(actions),
-               "on TPAs": sum(1 for a in actions if a["target_type"] == "TPA"),
-               "on providers": sum(1 for a in actions if a["target_type"] == "Provider"),
                "Provider names withheld (not approved or investigation referral)": withheld}
     return dict(data=dict(recommendations=recs, decisions=decisions, actions=actions), summary=summary, warnings=warn)
 
 
 PARSERS = {"F1": parse_f1, "F2": parse_f2, "F3": parse_f3, "F4": parse_f4, "F5": parse_f5, "F6": parse_f6}
+
+
+SIGNATURES = [   # register -> sheets that identify it (any listed group must be fully present; names compared loosely)
+    ("F1", [("daily intake", "daily log")]),
+    ("F2", [("gss register", "sample register")]),
+    ("F3", [("disputes", "batches"), ("disputes", "time log"), ("disputes", "actions")]),
+    ("F6", [("decisions",), ("policy & recommendations",)]),
+    ("F5", [("deliverables",)]),
+    ("F4", [("مطالبات الربع",)]),
+]
+
+
+def detect_kind(path):
+    """Which register a workbook is, from its sheet names; None when it is not one of the registers (a document)."""
+    try:
+        wb = load_workbook(path, read_only=True)
+        names = [norm(n) for n in wb.sheetnames]
+        wb.close()
+    except Exception:  # noqa: BLE001 - not a readable workbook: treated as a document
+        return None
+    for kind, groups in SIGNATURES:
+        for grp in groups:
+            if all(any(n == w or n.startswith(w) or w in n for n in names) for w in grp):
+                return kind
+    return None
 
 
 def parse(kind, path, label=""):

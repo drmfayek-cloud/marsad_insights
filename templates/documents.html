@@ -8,7 +8,7 @@
                              'التقارير ومحاضر المركز والأدلة وملفات الاعتراضات، مرتبطة بالإجراءات والقرارات والمخرجات ودفعات الاعتراضات.') }}
       {% if not can_upload %}{{ pick('You see the documents shared with CNHI.', 'تظهر لك المستندات المشاركة مع المركز.') }}{% endif %}</div>
   </div>
-  {% if can_upload %}<a class="btn primary" href="{{ url_for('document_upload') }}">{{ pick('Upload a document', 'تحميل مستند') }}</a>{% endif %}
+  {% if can_upload %}<a class="btn primary" href="{{ url_for('data_page') }}">{{ pick('Upload', 'تحميل') }}</a>{% endif %}
 </div>
 {% if config.DEMO %}<div class="flash error">{{ pick('Demo system: do not upload real CNHI documents. Files here are deleted when the preview restarts.',
   'نظام تجريبي: لا تحمّل مستندات حقيقية للمركز. تحذف الملفات عند إعادة تشغيل النسخة التجريبية.') }}</div>{% endif %}
@@ -19,6 +19,7 @@
   <label>{{ pick('Linked to', 'مرتبط بـ') }}<select name="kind" data-auto><option value="">{{ pick('Anything', 'أي عنصر') }}</option>
     {% for k, v in KINDS.items() %}<option value="{{ k }}" {{ 'selected' if args.get('kind') == k }}>{{ pick(v[0], v[1]) }}</option>{% endfor %}</select></label>
   {% if args.get('ref') %}<input type="hidden" name="ref" value="{{ args.get('ref') }}">{% endif %}
+  {% if args.get('group') %}<input type="hidden" name="group" value="{{ args.get('group') }}">{% endif %}
   <button class="btn">{{ pick('Search', 'بحث') }}</button>
   {% if args %}<a class="btn" href="{{ url_for('documents') }}">{{ pick('Clear', 'مسح') }}</a>{% endif %}
 </form>

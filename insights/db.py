@@ -50,6 +50,11 @@ MIGRATIONS = [
     CREATE TABLE doc_links (doc_id INTEGER NOT NULL, kind TEXT NOT NULL, ref TEXT NOT NULL, PRIMARY KEY (doc_id, kind, ref));
     CREATE INDEX ix_doc_links_ref ON doc_links(kind, ref);
     """,
+    # v3 (1.8): status of each corrective action recorded at every register upload (history and 'changed since last upload')
+    """
+    CREATE TABLE action_log (batch INTEGER NOT NULL, at TEXT NOT NULL, action_id TEXT NOT NULL, status TEXT NOT NULL);
+    CREATE INDEX ix_action_log ON action_log(action_id, batch);
+    """,
 ]
 
 

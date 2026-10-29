@@ -249,3 +249,8 @@ ul.plain { padding-inline-start: 18px; margin: 4px 0 12px; }
 .delform { margin-top: 18px; }
 .clip { font-size: 12px; white-space: nowrap; }
 table.hist .stat { white-space: normal; }
+
+.docscard .dchead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+details.docdetails { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+details.docdetails[open] { display: grid; gap: 12px; }
+details.docdetails summary { cursor: pointer; font-weight: 600; }

@@ -8,10 +8,6 @@ DEMO_PASSWORD = "Demo@Insights2026"
 TPAS = ["GlobeMed Saudi", "NextCare"]
 PROVIDERS = [f"Demo Hospital {c}" for c in "ABCDEFGHIJKLMN"]
 CODES = [("ELG", 3), ("EMG", 8), ("TRG", 4), ("PRV", 2), ("BEN", 6), ("DOC", 5), ("DQ", 9), ("CLM", 2)]
-NOTES = {1: "Deductions confirmed on two payment orders; balance due next cycle", 2: "Rule change live; evidence letter awaited",
-         3: "Action plan received; second milestone late", 4: "Notice acknowledged by the TPA",
-         5: "Recovered in full through payment-order deduction", 7: "Referred; counts only on the dashboard",
-         8: "Contract review scheduled with CNHI Provider Relations"}
 TYPES = {"ELG": "Eligibility not confirmed", "EMG": "Emergency criteria not met", "TRG": "Triage level inconsistent",
          "PRV": "Provider channel mismatch", "BEN": "Benefit limit or duration exceeded", "DOC": "Documentation missing",
          "DQ": "Data inconsistent", "CLM": "Billed above authorised amount"}
@@ -57,7 +53,7 @@ def build(today=None):
                                action=r.choice(["TPA level", "TPA level", "Provider level"]),
                                amount=round(r.choice([0, r.uniform(2000, 60000), r.uniform(20000, 250000)]), 2),
                                owner_type="CNHI Approvals", due=(d + dt.timedelta(days=7)).isoformat(),
-                               state=r.choice(["Open", ""]), closed=None,
+                               state="Open", closed=None,
                                shared_tpa=(d + dt.timedelta(days=2)).isoformat() if r.random() < 0.6 else None,
                                selection="", evidence="", sent_cnhi=sent.isoformat() if sent else None,
                                cnhi_response=r.choice(["", "Endorse - route to TPA", "Not endorsed"]) if sent else "",
@@ -66,8 +62,19 @@ def build(today=None):
                                confirmed=conf, declared=conf, logged=conf))
     codes = [dict(code=f"{fam}-{i:02d}", family=fam, type_en=TYPES[fam], type_ar="", fwa="", root="")
              for fam, k in CODES for i in range(1, k + 1)]
+    for f in fl:                                       # demo: flags are closed 3-20 days after logging, most with evidence
+        d0 = dt.date.fromisoformat(f["date"])
+        cl = d0 + dt.timedelta(days=r.randint(3, 20))
+        old = d0 < today - dt.timedelta(days=30)
+        if f["status"] == "Confirmed" and cl < today - dt.timedelta(days=2) and r.random() < (0.995 if old else 0.8):
+            f["state"], f["closed"] = "Closed", cl.isoformat()
+            f["evidence"] = f"CNHI-L-{r.randint(100, 999)}" if r.random() < 0.9 else ""
+            f["recovered"] = round(f["amount"] * r.choice([0, 0.5, 1, 1]), 2) if f["amount"] else 0
+        else:
+            f["recovered"] = None
     f1 = dict(intake=intake, review=review, flags=fl, codes=codes, nphies=[],
-              has=dict(shared_tpa=True, selection=False, evidence=False, fwa=False, root=False, closed=False, cnhi=True))
+              has=dict(shared_tpa=True, selection=False, evidence=True, fwa=False, root=False, closed=True, cnhi=True,
+                       recovered=True))
     # ---- F2 GSS workbook
     gss, sample = [], []
     ops = ["Satisfactory", "Satisfactory with exceptions", "Unsatisfactory", "Unsatisfactory"]
@@ -215,38 +222,7 @@ def build(today=None):
                  value=0.0, forum="Monthly management review", decision="Pending", decided=None, minutes=""),
             dict(id="D06", submitted=d(70), subject_type="Provider", subject="", topic="Contract action", source="BEN flags",
                  value=90000.0, forum="Monthly management review", decision="Pending", decided=None, minutes="")]
-    from insights import deid
-    from insights.parsers import norm
-    acts = []
-    for i, (dec, tt, tgt, typ, code, o, due, comp, ag, rc) in enumerate([
-            ("D01", "TPA", "GlobeMed Saudi", "Recover overpayment", "EMG", 35, 65, 60, 420000, 310000),
-            ("D01", "TPA", "GlobeMed Saudi", "Process or system fix", "EMG", 35, 55, 58, 0, 0),
-            ("D02", "TPA", "NextCare", "Corrective action plan", "DOC", 38, 68, None, 0, 0),
-            ("D02", "TPA", "NextCare", "Formal notice", "DOC", 38, 46, 44, 0, 0),
-            ("D03", "Provider", "Demo Hospital C", "Recover overpayment", "CLM", 40, 70, 66, 180000, 180000),
-            ("D03", "Provider", "Demo Hospital C", "Provider education", "CLM", 40, 60, 58, 0, 0),
-            ("D04", "Provider", "Demo Hospital F", "Referral for investigation", "EMG", 53, 120, None, 0, 0),
-            ("D06", "Provider", "Demo Hospital H", "Contract review", "BEN", 72, 90, None, 90000, 0)], start=1):
-        named = tt == "TPA" or (dec in ("D01", "D02", "D03") and typ != "Referral for investigation")
-        acts.append(dict(id=f"A{i:02d}", decision_id=dec, target_type=tt, target=tgt if named else "",
-                         tpa=tgt if tt == "TPA" else "", type=typ, code=f"{code}-01", source="",
-                         opened=d(o), due=d(due) or (start + dt.timedelta(days=due)).isoformat(), completed=d(comp) if comp else None,
-                         status="Completed" if comp and d(comp) else "Open", agreed=float(ag), recovered=float(rc),
-                         key="" if tt == "TPA" else deid.ref(norm(tgt)),
-                         evidence=(f"CNHI-L-{100 + i}" if comp and i != 2 else ""),
-                         owner={"TPA": f"{tgt} claims unit"}.get(tt, "CNHI Provider Relations"),
-                         updated=d(min(o + 20, (today - start).days)) or today.isoformat(),
-                         note=NOTES.get(i, "")))
-    # demo only: most completed actions reduce the matching findings afterwards, so GC-08 has something to show
-    done = [a for a in acts if a["completed"] and a["id"] != "A04"]
-    def after_action(f):
-        for a in done:
-            hit = f["code"] == a["code"] and (f["tpa"] == a["target"] if a["target_type"] == "TPA" else f["provider"] == "Demo Hospital C")
-            if hit and f["date"] > a["completed"]:
-                return True
-        return False
-    f1["flags"] = [f for f in f1["flags"] if not (after_action(f) and r.random() < 0.7)]
-    f6 = dict(recommendations=recs6, decisions=decs, actions=[a for a in acts if a["opened"]])
+    f6 = dict(recommendations=recs6, decisions=decs, actions=[])   # corrective actions come from F1-F3
     return {"F1": f1, "F2": f2, "F3": f3, "F4": f4, "F5": f5, "F6": f6}
 
 
@@ -256,26 +232,22 @@ def seed():
                                   ("cfo@demo.local", "Demo CNHI CFO", "cnhi")):
             db.insert("users", email=email, name=name, role=role, pw_hash=auth.hash_pw(DEMO_PASSWORD), created_at=db.now())
     built = build()
-    # an earlier F6 version, published 10 days ago, so the tracker shows changes and history
-    import copy
-    older = copy.deepcopy(built["F6"])
-    ten = (dt.date.today() - dt.timedelta(days=10)).isoformat()
-    for a in older["actions"]:
-        if a["id"] in ("A01", "A05"):                     # completed since the earlier version
-            a["completed"], a["evidence"], a["status"], a["recovered"] = None, "", "Open", 0.0
-    older["actions"] = [a for a in older["actions"] if a["opened"] and a["opened"] <= ten]
-    uid = db.insert("uploads", kind="F6", filename="demo_F6_previous.xlsx", sha256="demo", size=0, label="", status="staged",
-                    summary=db.dumps({"Demo": "synthetic data (earlier version)"}), warnings="[]", created_by="seed_demo",
-                    created_at=db.now())
-    store.save(uid, older)
-    store.publish(uid, "seed_demo")
-    db.update("uploads", uid, published_at=ten + " 09:00:00")
     for kind, data in built.items():
         uid = db.insert("uploads", kind=kind, filename=f"demo_{kind}.xlsx", sha256="demo", size=0, label="",
                         status="staged", summary=db.dumps({"Demo": "synthetic data"}), warnings="[]",
                         created_by="seed_demo", created_at=db.now())
         store.save(uid, data)
         store.publish(uid, "seed_demo")
+    # status history: the position 10 days ago (recent closures not yet made), then today
+    import copy
+    from insights import actions
+    ten = (dt.date.today() - dt.timedelta(days=10)).isoformat()
+    older = copy.deepcopy(built["F1"])
+    for f in older["flags"]:
+        if f["closed"] and f["closed"] > ten:
+            f["closed"], f["state"], f["evidence"] = None, "Open", ""
+    actions.record(0, {"F1": older, "F2": built["F2"], "F3": built["F3"]}, at=ten + " 09:00:00")
+    actions.record(store.current_ids()["F1"], store.current())
     seed_documents(built)
 
 
@@ -284,6 +256,8 @@ def seed_documents(built):
     from insights import library, samplefiles
     if db.val("SELECT COUNT(*) FROM documents", default=0):
         return
+    from insights import actions
+    tpa_ids = sorted(a["id"] for a in actions.derive(store.current()) if a["target_type"] == "TPA")
     deliv = built["F5"]["deliverables"]
     last = next((x for x in reversed(deliv) if x["submitted"]), deliv[0]) if deliv else None
     items = []
@@ -296,9 +270,9 @@ def seed_documents(built):
         ("MMR-01 management review minutes.docx", "minutes", "", "shared", [("decision", "D01"), ("decision", "D02")],
          samplefiles.docx(["Monthly management review: minutes MMR-01 (demo)", "D01 recovery from GlobeMed Saudi: approved.",
                            "D02 corrective action plan for NextCare: approved with changes."])),
-        ("CNHI-L-101 deduction confirmation.pdf", "evidence", "", "shared", [("action", "A01")],
+        ("CNHI-L-101 deduction confirmation.pdf", "evidence", "", "shared", [("action", tpa_ids[0])],
          samplefiles.pdf(["Deduction confirmation CNHI-L-101 (demo)", "Two payment orders reduced; balance due next cycle."])),
-        ("NextCare action plan - KPMG working note.docx", "other", "", "kpmg", [("action", "A03")],
+        ("NextCare action plan - KPMG working note.docx", "other", "", "kpmg", [("action", tpa_ids[-1])],
          samplefiles.docx(["KPMG working note (demo): NextCare action plan review", "Second milestone late; follow up at the weekly meeting."])),
     ]
     for name, cat, period, vis, links, raw in items:

@@ -40,8 +40,10 @@ corrective_actions:
   due_soon_days: 7        # open actions due within this many days show as 'Due soon' (amber)
   stale_days: 7           # warn when the F6 register has not been uploaded for longer than this
   status_note_max: 200    # characters kept from the status note
-
-# F6 candidate list (upload page): daily-register decision candidates per TPA and month
-candidates:
-  min_value_sar: 100000     # group (TPA, flag code, month) must be worth at least this
-  top_per_tpa_month: 5      # and be among the largest this many for that TPA and month
+  # Corrective actions are built from the registers (1.8): Daily Log flags grouped by TPA or provider, flag family and month;
+  # GSS claim flags per GSS report; disputes with a fraud, waste or abuse indicator per hospital and indicator.
+  closed_statuses: [Closed, Resolved, Recovered, Completed, Done, مغلق, مغلقة, منجز]   # Daily Log 'Status' values that close a flag
+  provider_keywords: [provider, hospital, facility, مقدم, مستشفى]                     # 'Action level' values aimed at a provider
+  provider_top_per_month: 10      # provider actions kept per month (largest by amount at risk)
+  provider_min_flags: 3           # ... with at least this many confirmed flags
+  provider_min_sar: 100000        # ... or at least this amount at risk

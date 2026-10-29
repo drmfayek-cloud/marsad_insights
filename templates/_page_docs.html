@@ -1,0 +1,13 @@
+{# latest documents of a page group (gdocs from the page route) #}
+{% set titles = {'decisions': ('Minutes and decision documents', 'المحاضر ومستندات القرارات'),
+                 'deliverables': ('Deliverable documents', 'مستندات المخرجات'),
+                 'disputes': ('Objection files and KPMG opinions', 'ملفات الاعتراض وآراء KPMG')} %}
+<div class="card wide docscard">
+  <div class="dchead"><h3>{{ pick(*titles[gdocs.group]) }}</h3>
+    <a class="small" href="{{ url_for('documents', group=gdocs.group) }}">{{ pick('All', 'الكل') }} →</a></div>
+  {% if gdocs.docs %}<ul class="plain">{% for d in gdocs.docs %}
+    <li><a href="{{ url_for('document_view', doc_id=d.id) }}">{{ d.title }}</a>
+      <span class="small muted">· {{ pick(CATS[d.category][0], CATS[d.category][1]) }}{% if d.period %} · <span dir="ltr">{{ d.period }}</span>{% endif %} · <span dir="ltr">{{ d.uploaded_at[:10] }}</span></span>
+      · <a class="small" href="{{ url_for('document_download', doc_id=d.id) }}">{{ pick('Download', 'تنزيل') }}</a></li>{% endfor %}</ul>
+  {% else %}<p class="muted small">{{ pick('None yet. Upload them on the Upload page; they appear here by their category.', 'لا يوجد بعد. حمّلها من صفحة التحميل؛ تظهر هنا حسب فئتها.') }}</p>{% endif %}
+</div>

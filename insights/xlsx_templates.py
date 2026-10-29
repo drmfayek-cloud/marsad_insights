@@ -131,15 +131,6 @@ F6_SHEETS = {
         ["EXAMPLE-D01", dt.date(2026, 10, 5), "TPA", "GlobeMed Saudi", "Recovery", "Flag EMG-01, Sep-2026", 250000,
          "Monthly management review", "Approved", dt.date(2026, 10, 12), "MMR-2026-10", ""],
         {"C": SUBJECTS, "E": TOPICS, "H": FORUMS, "I": DECISIONS}),
-    "Corrective actions": (
-        ["Action ID", "Decision ID", "Target type", "Target name", "TPA", "Action type", "Flag code", "Source reference",
-         "Opened date", "Due date", "Completed date", "Status", "Value agreed for recovery (SAR)", "Value recovered (SAR)",
-         "Evidence reference", "Action owner (unit)", "Last update date", "Status note (shown on dashboard)", "Note"],
-        [13, 13, 12, 30, 18, 26, 11, 24, 13, 13, 14, 13, 18, 16, 20, 22, 14, 44, 36],
-        ["EXAMPLE-A01", "EXAMPLE-D01", "TPA", "GlobeMed Saudi", "GlobeMed Saudi", "Recover overpayment", "EMG-01",
-         "F1:GlobeMed Saudi:EMG-01:2026-09", dt.date(2026, 10, 13), dt.date(2026, 11, 12), None, "Open", 250000, None, "",
-         "GlobeMed claims unit", dt.date(2026, 10, 20), "Reprocessing list sent to the TPA; reply expected by 5 Nov", ""],
-        {"C": ["TPA", "Provider"], "F": ACTION_TYPES, "L": ACTION_STATUS}),
 }
 
 
@@ -149,28 +140,16 @@ def corrective_template():
     gd.title = "Guide"
     gd.column_dimensions["A"].width = 120
     lines = [
-        ("Governance & corrective-action register - MARSAD Insights (F6)", True),
-        ("Tracks the loop from findings to change: recommendation or escalation -> CNHI decision -> corrective action on a TPA "
-         "or provider, or a policy or manual change -> completed -> effect on later findings. Feeds the Governance page "
-         "(GC-01 to GC-08), EX-11 and FW-08.", False),
-        ("Maintained by KPMG from CNHI decision minutes and correspondence. Record the minutes reference for every decision.", False),
-        ("Policy & recommendations: one row per recommendation to CNHI (policy, manual, contract or pricing, process, system). "
-         "Move it through the stages and date each stage.", False),
+        ("Governance register - policy changes and CNHI decisions - MARSAD Insights (F6)", True),
+        ("Records what sits outside the daily registers: recommendations to change a policy, manual, contract or process, "
+         "and the decisions CNHI takes on findings. Feeds the Governance page (GC-01 to GC-03) and FW-08. Corrective actions "
+         "themselves are built automatically from the daily register, the GSS workbook and the disputes tracker.", False),
+        ("Maintained by KPMG from CNHI decision minutes and correspondence. Record the minutes reference for every decision, "
+         "and upload the minutes themselves on the Upload page (category: CNHI minutes).", False),
+        ("Policy & recommendations: one row per recommendation to CNHI. Move it through the stages and date each stage.", False),
         ("Decisions: one row per item submitted to CNHI for a decision, with the outcome and its date.", False),
-        ("Corrective actions: one row per action on a TPA or a provider, linked to its Decision ID. Enter the Flag code when the "
-         "action addresses a flag of the daily register: the dashboard then compares findings before and after the action.", False),
-        ("Provider names: the dashboard keeps a provider's name only when the linked decision is Approved (or Approved with "
-         "changes) and the action is not a referral for investigation. Otherwise the name is discarded at upload and the "
-         "provider is counted without a name. TPA names are always shown.", False),
-        ("Status is calculated by the dashboard from the dates, never typed: Not started (no opened date), On track, Due soon "
-         "(due within 7 days), Overdue (past the due date), Completed - evidence pending (no evidence reference), Completed - "
-         "verified, Cancelled. Use the Status column only for Cancelled; enter a Completed date only with evidence.", False),
-        ("Evidence reference: the document that proves completion or recovery (letter number, payment-order or deduction "
-         "reference). Value recovered only on evidence of a deduction, credit note or payment, never on a promise.", False),
-        ("Status note: up to 200 characters, shown on the dashboard to CNHI and KPMG users. Write it as KPMG. Never include "
-         "a person's name, a patient detail or an ID number: a note containing a 10-digit number is dropped at upload.", False),
-        ("Source reference: when a row comes from the candidate list, keep its key (for example F1:GlobeMed Saudi:EMG-01:2026-09) "
-         "so the candidate is not offered again.", False),
+        ("Provider names: kept only when the decision is Approved (or Approved with changes) and is not an investigation "
+         "referral; otherwise the name is discarded at upload. TPA names are always shown.", False),
         ("Row 5 of each sheet is an example (first cell starts with EXAMPLE) and is ignored. Note columns are never read. "
          "Do not insert rows above the header row (row 4).", False),
     ]

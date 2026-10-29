@@ -1,6 +1,6 @@
-# KPI dictionary v0.6 (29 October 2026): v0.5 plus GC-09 corrective-action status (D-24); status rules in insights/actions.py.
-# GV-01 to GV-06 sit on the KPMG delivery & effort page. Calculations live in insights/kpi.py.
-version: '0.6'
+# KPI dictionary v0.7 (29 October 2026): corrective actions built from the registers (D-25); F6 holds policy changes and CNHI decisions.
+# Calculations live in insights/kpi.py; corrective-action rules in insights/actions.py.
+version: '0.7'
 pages:
 - code: EX
   slug: executive
@@ -276,14 +276,14 @@ kpis:
   unit: Count
   date_basis: Opened, due and completed dates
   counting_unit: Action
-  source: F6 Governance & corrective-action register
-  source_columns: 'Corrective actions: Opened date, Due date, Completed date, Status'
+  source: F1 Daily register (Daily Log), F2 GSS workbook (Sample Register flags), F3 Hospital disputes tracker
+  source_columns: 'Daily Log: Due date, Status, Date closed, Evidence reference; Sample Register: Flag, Due date, Flag status, Closed date; Disputes: FWA indicator, CNHI final decision'
   status: Mapped
   refresh: Monthly
   owner: KPMG engagement manager
   target: '-'
-  caveat: Status is calculated from the dates (D-24). Cancelled actions are left out. A warning shows when the register is more than 7 days old.
-  decisions: D-23, D-24
+  caveat: Actions are built from the registers (D-25); one late item makes its action overdue, and the tracker shows how many items are late. A warning shows when the daily register is more than 7 days old.
+  decisions: D-23, D-24, D-25
 - id: DR-01
   page: DR
   tier: 2
@@ -1056,7 +1056,7 @@ kpis:
   unit: Count
   date_basis: Status date
   counting_unit: Recommendation
-  source: F6 Governance & corrective-action register (older F5 registers still read)
+  source: F6 Governance register (policy changes and CNHI decisions) (older F5 registers still read)
   source_columns: 'Policy & recommendations: Stage, Proposed date, Approved date, Issued or effective date'
   status: Needs new source
   refresh: Monthly
@@ -1394,14 +1394,14 @@ kpis:
   unit: Count
   date_basis: As-at date (period end or today)
   counting_unit: Action
-  source: F6 Governance & corrective-action register
-  source_columns: 'Corrective actions: Opened, Due, Completed dates, Evidence reference, Status (Cancelled only)'
+  source: F1 Daily register (Daily Log), F2 GSS workbook (Sample Register flags), F3 Hospital disputes tracker
+  source_columns: Due dates, closed dates and evidence references of the items in the three registers
   status: Mapped
   refresh: Weekly
   owner: KPMG engagement manager
   target: 0 overdue
-  caveat: Status is never typed. A warning shows when the register has not been uploaded for more than 7 days. The action tracker lists every action, with history and downloads.
-  decisions: D-23, D-24
+  caveat: 'Actions are built from the registers (D-25): nothing is typed or re-uploaded. Status is never typed. A warning shows when the daily register is more than 7 days old.'
+  decisions: D-23, D-24, D-25
 - id: GC-01
   page: GC
   tier: 2
@@ -1414,7 +1414,7 @@ kpis:
   unit: Count
   date_basis: Proposed and issued dates
   counting_unit: Recommendation
-  source: F6 Governance & corrective-action register
+  source: F6 Governance register (policy changes and CNHI decisions)
   source_columns: 'Policy & recommendations: Type, Document or policy affected, Stage, dates'
   status: Mapped
   refresh: Monthly
@@ -1435,7 +1435,7 @@ kpis:
   unit: Days
   date_basis: Approved / issued date
   counting_unit: Recommendation
-  source: F6 Governance & corrective-action register
+  source: F6 Governance register (policy changes and CNHI decisions)
   source_columns: 'Policy & recommendations: Proposed, Approved, Issued or effective dates'
   status: Mapped
   refresh: Monthly
@@ -1456,7 +1456,7 @@ kpis:
   unit: Count
   date_basis: Decision date
   counting_unit: Decision
-  source: F6 Governance & corrective-action register
+  source: F6 Governance register (policy changes and CNHI decisions)
   source_columns: 'Decisions: Date submitted, Topic, Value at stake, Decision, Decision date, Minutes reference'
   status: Mapped
   refresh: Monthly
@@ -1471,20 +1471,20 @@ kpis:
   placement: Page
   name_en: Corrective actions on TPAs
   name_ar: الإجراءات التصحيحية على شركات إدارة المطالبات
-  def_en: 'Corrective actions on TPAs (reprocessing, recovery, formal notice, service-level penalty, process fix, action plan): open, overdue, opened and completed in the period, by TPA.'
-  def_ar: 'الإجراءات التصحيحية على شركات إدارة المطالبات (إعادة معالجة، استرداد، إنذار رسمي، غرامة مستوى خدمة، إصلاح إجراء، خطة تصحيحية): المفتوح والمتأخر وما فتح وأنجز في الفترة، حسب الشركة.'
-  formula: COUNT(TPA actions open at period end); overdue = open and due date passed
+  def_en: 'Corrective actions on TPAs built from the registers: confirmed Daily Log flags grouped by TPA, flag family and month, and the flagged claims of each GSS report; open, overdue, started and completed in the period, by TPA.'
+  def_ar: 'الإجراءات التصحيحية على شركات إدارة المطالبات المبنية من السجلات: الملاحظات المؤكدة في السجل اليومي مجمعة حسب الشركة وعائلة الملاحظة والشهر، والمطالبات ذات الملاحظات في كل تقرير GSS؛ المفتوح والمتأخر وما بدأ وأنجز في الفترة، حسب الشركة.'
+  formula: COUNT(TPA actions open at period end); overdue = an open item past its due date
   unit: Count
   date_basis: Opened, due and completed dates
   counting_unit: Action
-  source: F6 Governance & corrective-action register
-  source_columns: 'Corrective actions: Target type = TPA, Target name, Action type, dates, Status, Value agreed'
+  source: F1 Daily register (Daily Log), F2 GSS workbook (Sample Register flags), F3 Hospital disputes tracker
+  source_columns: 'Daily Log: TPA, Flag code, Date logged, Due date, Status, Date closed; Sample Register: Flag, Due date, Flag status, Closed date'
   status: Mapped
   refresh: Monthly
   owner: KPMG engagement manager
   target: '-'
-  caveat: TPAs are named.
-  decisions: D-23
+  caveat: Depends on Status and Date closed being filled in the Daily Log when a flag is resolved.
+  decisions: D-23, D-24, D-25
   section: actions
 - id: GC-05
   page: GC
@@ -1492,20 +1492,20 @@ kpis:
   placement: Page
   name_en: TPA actions completed on time
   name_ar: إنجاز الشركات للإجراءات في موعدها
-  def_en: Share of TPA corrective actions completed in the period by their due date, with the number still open past due.
-  def_ar: نسبة الإجراءات التصحيحية على الشركات التي أنجزت خلال الفترة في موعدها أو قبله، مع عدد المفتوح بعد موعده.
+  def_en: Share of TPA corrective actions completed in the period (every item closed) by their earliest due date, with the number still open past due.
+  def_ar: نسبة الإجراءات التصحيحية على الشركات التي أنجزت خلال الفترة (أغلقت كل بنودها) في موعدها، مع عدد المفتوح بعد موعده.
   formula: COUNT(completed in period, Completed <= Due) / COUNT(completed in period with a due date)
   unit: '%'
   date_basis: Completed date
   counting_unit: Action
-  source: F6 Governance & corrective-action register
-  source_columns: 'Corrective actions: Due date, Completed date'
+  source: F1 Daily register (Daily Log), F2 GSS workbook (Sample Register flags), F3 Hospital disputes tracker
+  source_columns: Due dates and closed dates of the items
   status: Mapped
   refresh: Monthly
   owner: KPMG engagement manager
   target: '-'
   caveat: Measures the TPA's response against the agreed date.
-  decisions: D-23
+  decisions: D-23, D-24, D-25
   section: actions
 - id: GC-06
   page: GC
@@ -1513,20 +1513,20 @@ kpis:
   placement: Page
   name_en: Corrective actions on providers
   name_ar: الإجراءات التصحيحية على مقدمي الخدمة
-  def_en: Corrective actions on providers by type (recovery, education, pre-authorization restriction, contract review, referral for investigation), open at period end, and providers with repeat actions.
-  def_ar: الإجراءات التصحيحية على مقدمي الخدمة حسب النوع (استرداد، توعية، تقييد الموافقات المسبقة، مراجعة العقد، إحالة للتحقيق)، والمفتوح بنهاية الفترة، ومقدمو الخدمة ذوو الإجراءات المتكررة.
+  def_en: 'Corrective actions on providers built from the registers: provider-level Daily Log flags (the largest per month, and every escalated one) and hospital disputes with a fraud, waste or abuse indicator; open at period end, by issue, and providers with actions in two or more months.'
+  def_ar: 'الإجراءات التصحيحية على مقدمي الخدمة المبنية من السجلات: ملاحظات السجل اليومي على مستوى مقدم الخدمة (الأكبر شهريا وكل ما صعد للمركز) واعتراضات المستشفيات التي عليها مؤشر احتيال أو هدر؛ المفتوح بنهاية الفترة حسب الموضوع، ومقدمو الخدمة ذوو الإجراءات في شهرين أو أكثر.'
   formula: COUNT(provider actions opened <= end) by Action type; open at end; providers with 2+ actions
   unit: Count
   date_basis: Opened date
   counting_unit: Action
-  source: F6 Governance & corrective-action register
-  source_columns: 'Corrective actions: Target type = Provider, Target name, Action type, Decision ID'
+  source: F1 Daily register (Daily Log), F2 GSS workbook (Sample Register flags), F3 Hospital disputes tracker
+  source_columns: 'Daily Log: Action level, Provider, CNHI response; Disputes: Hospital, FWA indicator, CNHI final decision'
   status: Mapped
   refresh: Monthly
   owner: KPMG engagement manager
   target: '-'
-  caveat: Providers are named only for approved decisions and never for investigation referrals (counts only). Other names are discarded at upload (D-23).
-  decisions: D-23
+  caveat: Providers are named only once CNHI has endorsed or decided the case; referrals for investigation are counts only (D-23).
+  decisions: D-23, D-24, D-25
   section: actions
 - id: GC-07
   page: GC
@@ -1534,20 +1534,20 @@ kpis:
   placement: Page
   name_en: Recovery from corrective actions
   name_ar: الاسترداد من الإجراءات التصحيحية
-  def_en: SAR recovered against SAR agreed for recovery in corrective actions on TPAs and providers, cumulative to period end.
-  def_ar: المبالغ المستردة مقابل المبالغ المتفق على استردادها في الإجراءات التصحيحية على الشركات ومقدمي الخدمة، تراكميا حتى نهاية الفترة.
-  formula: SUM(Value recovered) / SUM(Value agreed for recovery), actions opened <= period end
+  def_en: SAR recovered on evidence against the amount at risk of completed actions, cumulative to period end.
+  def_ar: المبالغ المستردة بناء على دليل مقابل القيمة محل الملاحظة في الإجراءات المنجزة، تراكميا حتى نهاية الفترة.
+  formula: SUM(Recovered) / SUM(amount at risk of completed actions)
   unit: SAR / %
   date_basis: Opened date (cumulative)
   counting_unit: Action
-  source: F6 Governance & corrective-action register
-  source_columns: 'Corrective actions: Value agreed for recovery (SAR), Value recovered (SAR)'
-  status: Mapped
+  source: F1 Daily register (Daily Log)
+  source_columns: 'Daily Log: Recovered (SAR) - new column'
+  status: Needs new column
   refresh: Monthly
   owner: KPMG engagement manager
   target: '-'
-  caveat: 'This is the Recovered stage of D-03: cash actually recovered, unlike the values identified elsewhere.'
-  decisions: D-23
+  caveat: Add a 'Recovered (SAR)' column to the Daily Log, filled only on evidence of a deduction, credit note or payment.
+  decisions: D-23, D-24, D-25
   section: effect
 - id: GC-08
   page: GC
@@ -1555,18 +1555,18 @@ kpis:
   placement: Page
   name_en: Effect of corrective actions
   name_ar: أثر الإجراءات التصحيحية
-  def_en: For completed actions linked to a flag code, the level of the same finding for the same TPA or provider in the 90 days before the action opened and the 90 days after it was completed.
-  def_ar: 'للإجراءات المنجزة المرتبطة برمز ملاحظة: مستوى الملاحظة نفسها لدى الشركة أو مقدم الخدمة نفسه خلال 90 يوما قبل فتح الإجراء و90 يوما بعد إنجازه.'
+  def_en: For completed actions from the daily register, the level of the same flag family for the same TPA or provider in the 90 days before the action started and the 90 days after it was completed.
+  def_ar: 'للإجراءات المنجزة من السجل اليومي: مستوى عائلة الملاحظة نفسها لدى الشركة أو مقدم الخدمة نفسه خلال 90 يوما قبل بدء الإجراء و90 يوما بعد إنجازه.'
   formula: 'TPA: encounters with the flag / encounters reviewed for that TPA; provider: confirmed flags per month. Improved = 10% or more lower after'
   unit: '% of actions'
   date_basis: Opened and completed dates
   counting_unit: Action
-  source: F6 Governance & corrective-action register
-  source_columns: 'Corrective actions: Flag code, Opened date, Completed date; F1 Daily Log and Daily Intake'
+  source: F1 Daily register (Daily Log, Daily Intake)
+  source_columns: 'Daily Log: Flag code, Date logged, Date closed; Daily Intake: Reviewed'
   status: Mapped
   refresh: Monthly
   owner: KPMG engagement manager
   target: '-'
   caveat: Needs at least 30 days of review data after completion. A change in findings has several causes; read it as an indicator, not proof.
-  decisions: D-23
+  decisions: D-23, D-24, D-25
   section: effect

@@ -1,6 +1,6 @@
 {# shared fields of the upload and edit forms: v = current values #}
 <label>{{ pick('Title', 'العنوان') }}<input name="title" maxlength="200" value="{{ v.get('title', '') }}" placeholder="{{ pick('Defaults to the file name', 'افتراضيا اسم الملف') }}"></label>
-<label>{{ pick('Category', 'الفئة') }}<select name="category" required><option value="">-</option>
+<label>{{ pick('Category', 'الفئة') }}<select name="category" {{ '' if cat_optional else 'required' }}><option value="">{{ pick('Guess from the file name', 'استنتاج من اسم الملف') if cat_optional else '-' }}</option>
   {% for k, c in CATS.items() %}<option value="{{ k }}" {{ 'selected' if v.get('category') == k }}>{{ pick(c[0], c[1]) }}</option>{% endfor %}</select></label>
 <label>{{ pick('Period (month)', 'الفترة (الشهر)') }}<input type="month" name="period" value="{{ v.get('period', '') }}"></label>
 <label>{{ pick('Description (optional)', 'وصف (اختياري)') }}<input name="description" maxlength="500" value="{{ v.get('description', '') }}"></label>

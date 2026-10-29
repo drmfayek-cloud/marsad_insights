@@ -11,7 +11,7 @@ import tempfile
 
 from flask import (Flask, Response, abort, flash, g, redirect, render_template, request, session, url_for)
 
-from insights import actions, auth, candidates, library, config, db, deid, kpi, store, theme
+from insights import actions, auth, library, parsers, config, db, deid, kpi, store, theme
 from insights.i18n import lang, pick, t
 from insights.parsers import ParseError, parse
 from insights.xlsx_templates import corrective_template, governance_template
@@ -210,7 +210,7 @@ def create_app():
             badge = "approved"
         else:
             ctx = kpi.Ctx(data, period, tpa, internal=g.user["role"] in auth.INTERNAL)
-            ctx.meta = {"F6": actions.meta()}
+            ctx.meta = {"F1": actions.meta()}
             results = kpi.compute_page(pg["code"], ctx)
             badge = "filtered" if (snap and tpa) else "provisional"
         trend, sparks = None, {}
@@ -221,79 +221,85 @@ def create_app():
         internal = g.user["role"] in auth.INTERNAL
         defs = [k for k in config.kpis_for(pg["code"]) if internal or k.get("audience") != "kpmg"]   # KPMG-only tiles
         results = {k: v for k, v in results.items() if k in {d["id"] for d in defs}}
-        return render_template("page.html", pg=pg, defs=defs, results=results, months=ms, period=period, tpa=tpa,
+        gdocs = {}
+        if pg["code"] in ("GC", "OP", "HD"):
+            grp = {"GC": "decisions", "OP": "deliverables", "HD": "disputes"}[pg["code"]]
+            gdocs = dict(group=grp, docs=library.search(internal, group=grp)[:6])
+        return render_template("page.html", gdocs=gdocs, CATS=library.CATEGORIES, pg=pg, defs=defs, results=results, months=ms, period=period, tpa=tpa,
                                tpas=tpa_list, badge=badge, snap=snap, trend=trend, sparks=sparks, has_data=bool(data),
                                as_of=data_as_of())
 
     # ------------------------------------------------------------------ corrective-action tracker (all signed-in users)
     def tracker_state():
-        """F6 dataset, as-at date and comparison base for the tracker. A closed month uses the register version that was
-        current when the month was closed, so its statuses are the month-end position."""
+        """Actions built from the registers, as-at date and the changes since the last upload. A closed month uses the
+        register versions that were current when the month was closed, so its statuses are the month-end position."""
         asof_arg = request.args.get("asof", "")
         today = dt.date.today().isoformat()
-        cur_ids = store.current_ids()
-        uid, asof, frozen = cur_ids.get("F6"), today, False
+        data, asof, frozen = store.current(), today, False
         if asof_arg and len(asof_arg) == 7 and asof_arg[4] == "-" and asof_arg[:4].isdigit():
             y, m = int(asof_arg[:4]), int(asof_arg[5:7])
             end = dt.date(y, m, 28) + dt.timedelta(days=4)
             asof = min((end - dt.timedelta(days=end.day)).isoformat(), today)
             snap = db.q1("SELECT * FROM snapshots WHERE month=?", (asof_arg,))
             ids = db.loads(snap["datasets"], {}) if snap else {}
-            if ids.get("F6"):
-                uid, frozen = int(ids["F6"]), True
-        f6 = store.load(uid) if uid else None
-        prev = actions.previous_statuses(uid) if (uid and not frozen) else None
-        return f6, asof, asof_arg, frozen, prev
+            if any(ids.get(k) for k in ("F1", "F2", "F3")):
+                data = {k: store.load(int(ids[k])) for k in ("F1", "F2", "F3") if ids.get(k)}
+                frozen = True
+        has = any(data.get(k) for k in ("F1", "F2", "F3"))
+        acts = actions.derive(data, asof) if has else []
+        prev = actions.changes() if (has and not frozen) else None
+        return acts, asof, asof_arg, frozen, prev, has
 
     def tracker_filters():
         return dict(tpa=request.args.get("tpa", ""), target=request.args.get("target", ""), st=request.args.get("status", ""),
-                    atype=request.args.get("type", ""))
+                    atype=request.args.get("type", ""), src=request.args.get("source", ""))
 
     @app.route("/p/governance/actions")
     @auth.login_required
     def action_tracker():
-        f6, asof, asof_arg, frozen, prev = tracker_state()
+        acts, asof, asof_arg, frozen, prev, has = tracker_state()
         f = tracker_filters()
-        allrows = actions.rows(f6, asof, tpa=f["tpa"], target=f["target"], atype=f["atype"], prev=prev) if f6 else []
+        if "status" not in request.args:
+            f["st"] = "open"                       # open actions first; 'All' shows everything
+        allrows = actions.rows(acts, asof, tpa=f["tpa"], target=f["target"], atype=f["atype"], src=f["src"], prev=prev)
         counts, ages = actions.summary(allrows)
         rs = [r for r in allrows if not f["st"] or (r["st"] in actions.OPEN if f["st"] == "open" else r["st"] == f["st"])]
         months = [m for m in kpi.months(store.current()) if m]
-        base = dict(asof=asof_arg, tpa=f["tpa"], target=f["target"], status=f["st"], type=f["atype"])
+        base = dict(asof=asof_arg, tpa=f["tpa"], target=f["target"], status=f["st"], type=f["atype"], source=f["src"])
 
         def qs(**kw):
             from urllib.parse import urlencode
-            return urlencode({k: v for k, v in dict(base, **kw).items() if v})
+            d = dict(base, **kw)
+            return urlencode({k: v for k, v in d.items() if v or k == "status"})
         clips = library.counts_for("action", g.user["role"] in auth.INTERNAL)
-        return render_template("actions.html", qs=qs, clips=clips, rows=rs, counts=counts, ages=ages, asof=asof, asof_arg=asof_arg, frozen=frozen,
-                               f=f, meta=actions.meta(), months=months, has=bool(f6), prev=prev is not None,
-                               tpas=sorted({a["tpa"] for a in (f6 or {}).get("actions", []) if a["tpa"]}),
-                               types=sorted({a["type"] for a in (f6 or {}).get("actions", []) if a["type"]}),
-                               STATUS=actions.STATUS, label=actions.label, tname=actions.target_name, gl=kpi.gl, pg=config.PAGE_BY_SLUG["governance"])
+        return render_template("actions.html", qs=qs, clips=clips, rows=rs[:500], total=len(rs), counts=counts, ages=ages, asof=asof,
+                               asof_arg=asof_arg, frozen=frozen, f=f, meta=actions.meta(), months=months, has=has,
+                               prev=prev is not None, tpas=sorted({a["tpa"] for a in acts if a["tpa"]}),
+                               types=sorted({(a["type"], actions.type_label(a)) for a in acts}, key=lambda x: x[1]),
+                               SOURCES=actions.SOURCES, STATUS=actions.STATUS, label=actions.label, tname=actions.target_name,
+                               tlabel=actions.type_label, gl=kpi.gl, pg=config.PAGE_BY_SLUG["governance"])
 
     @app.route("/p/governance/actions/<aid>")
     @auth.login_required
     def action_detail(aid):
-        f6, asof, asof_arg, frozen, prev = tracker_state()
-        r = next((x for x in actions.rows(f6, asof, prev=prev) if x["id"] == aid), None) if f6 else None
+        acts, asof, asof_arg, frozen, prev, has = tracker_state()
+        r = next((x for x in actions.rows(acts, asof, prev=prev) if x["id"] == aid), None)
         if r is None:
             abort(404)
-        recs = {x["id"]: x for x in f6["recommendations"]}
         ins = g.user["role"] in auth.INTERNAL
         docs = [dict(x, via="action") for x in library.for_link("action", aid, ins)]
-        if r["decision_id"]:
-            docs += [dict(x, via="decision") for x in library.for_link("decision", r["decision_id"], ins)]
-        return render_template("action.html", docs=docs, can_upload=ins, CATS=library.CATEGORIES, r=r, asof=asof, asof_arg=asof_arg, hist=actions.history().get(aid, []),
-                               rec=recs.get(r["decision"].get("subject", "")), STATUS=actions.STATUS, label=actions.label,
-                               tname=actions.target_name, gl=kpi.gl, pg=config.PAGE_BY_SLUG["governance"])
+        return render_template("action.html", docs=docs, can_upload=ins, CATS=library.CATEGORIES, r=r, asof=asof, asof_arg=asof_arg,
+                               hist=actions.history(aid), note=actions.note_text, SOURCES=actions.SOURCES, STATUS=actions.STATUS, label=actions.label,
+                               tname=actions.target_name, tlabel=actions.type_label, gl=kpi.gl, pg=config.PAGE_BY_SLUG["governance"])
 
     @app.route("/p/governance/actions.xlsx")
     @auth.login_required
     def action_tracker_xlsx():
-        f6, asof, asof_arg, frozen, prev = tracker_state()
-        if not f6:
+        acts, asof, asof_arg, frozen, prev, has = tracker_state()
+        if not has:
             abort(404)
         f = tracker_filters()
-        rs = actions.rows(f6, asof, prev=prev, **f)
+        rs = actions.rows(acts, asof, prev=prev, **f)
         desc = ", ".join(f"{k}={v}" for k, v in f.items() if v)
         meta = actions.meta()
         body = actions.to_xlsx(rs, asof, desc, meta.get("published", "-"), g.user["email"])
@@ -318,43 +324,16 @@ def create_app():
     def documents():
         a = request.args
         docs = library.search(internal(), q=a.get("q", ""), category=a.get("category", ""), kind=a.get("kind", ""),
-                              ref=a.get("ref", ""), period=a.get("period", ""))
+                              ref=a.get("ref", ""), period=a.get("period", ""), group=a.get("group", ""))
         lk = {d["id"]: library.links(d["id"]) for d in docs}
         return render_template("documents.html", docs=docs, links=lk, labels=link_labels(store.current()), args=a,
                                CATS=library.CATEGORIES, KINDS=library.LINK_KINDS, can_upload=internal())
 
-    @app.route("/documents/upload", methods=["GET", "POST"])
+    @app.route("/documents/upload")
     @auth.roles_required("admin", "kpmg")
     def document_upload():
-        parent = db.q1("SELECT * FROM documents WHERE id=? AND status='active'", (request.values.get("parent", type=int),)) \
-            if request.values.get("parent") else None
-        form = request.form if request.method == "POST" else None
-        if request.method == "POST":
-            f = request.files.get("file")
-            meta = doc_form_meta(request.form)
-            try:
-                raw = f.read() if f else b""
-                doc_id, check, n = library.save(raw, f.filename if f else "", meta, g.user["email"],
-                                                confirm=request.form.get("confirm") == "1",
-                                                parent=parent["id"] if parent else None)
-            except library.LibraryError as e:
-                auth.audit("document_rejected", f"{f.filename if f else '-'}: {e}")
-                flash(str(e), "error")
-            else:
-                detail = f"#{doc_id} {meta['category']} {meta['visibility']} {f.filename}"
-                if check != "clean":
-                    detail += f" - uploader confirmed no patient identifiers ({check}, {n} matches)"
-                auth.audit("document_new_version" if parent else "document_uploaded", detail)
-                flash(pick("Document saved.", "تم حفظ المستند."), "ok")
-                return redirect(url_for("document_view", doc_id=doc_id))
-        pre = dict(parent) if parent else {}
-        if parent:
-            pre["links"] = library.links(parent["id"])
-        elif request.args.get("kind") and request.args.get("ref"):
-            pre["links"] = [(request.args["kind"], request.args["ref"])]
-            pre["category"] = request.args.get("category", "")
-        return render_template("document_upload.html", form=form, pre=pre, parent=parent, CATS=library.CATEGORIES,
-                               KINDS=library.LINK_KINDS, options=library.link_options(store.current()))
+        """Kept for links (new version, add evidence): everything is uploaded on the one upload page."""
+        return redirect(url_for("data_page", **request.args))
 
     @app.route("/documents/<int:doc_id>", methods=["GET", "POST"])
     @auth.login_required
@@ -398,50 +377,87 @@ def create_app():
 
     # ------------------------------------------------------------------ data uploads (admin)
     @app.route("/data", methods=["GET", "POST"])
-    @auth.roles_required("admin")
+    @auth.roles_required("admin", "kpmg")
     def data_page():
+        """One upload for everything: a register workbook is recognised from its sheets and read into the dashboard;
+        any other PDF, Word or Excel file is kept as a document."""
+        form = None
         if request.method == "POST":
-            kind = request.form.get("kind")
             f = request.files.get("file")
-            if kind not in store.KINDS or f is None or not f.filename:
-                flash("Choose the workbook type and a file.", "error")
-                return redirect(url_for("data_page"))
-            ext = os.path.splitext(f.filename)[1].lower()
-            if ext not in ALLOWED:
-                flash("Upload an Excel workbook (.xlsx or .xlsm).", "error")
+            if f is None or not f.filename:
+                flash(pick("Choose a file.", "اختر ملفا."), "error")
                 return redirect(url_for("data_page"))
             raw = f.read()
-            if raw[:2] != b"PK":
-                flash("The file is not a valid Excel workbook.", "error")
-                return redirect(url_for("data_page"))
-            fd, tmp = tempfile.mkstemp(suffix=ext)
+            ext = os.path.splitext(f.filename)[1].lower()
+            kind = None
+            if ext in ALLOWED and raw[:2] == b"PK" and not request.form.get("parent"):
+                fd, tmp = tempfile.mkstemp(suffix=ext)
+                try:
+                    with os.fdopen(fd, "wb") as fh:
+                        fh.write(raw)
+                    kind = parsers.detect_kind(tmp)
+                    if kind:
+                        if g.user["role"] != "admin":
+                            flash(pick(f"This is the {store.KINDS[kind]}. Registers are published by the administrator.",
+                                       f"هذا {store.KINDS_AR[kind]}. ينشر المسؤول السجلات."), "error")
+                            return redirect(url_for("data_page"))
+                        try:
+                            result = parse(kind, tmp, request.form.get("label", ""))
+                        except ParseError as e:
+                            auth.audit("upload_rejected", f"{kind} {f.filename}: {e}")
+                            flash(f"{pick(store.KINDS[kind], store.KINDS_AR[kind])}: {e}", "error")
+                            return redirect(url_for("data_page"))
+                finally:
+                    if os.path.exists(tmp):
+                        os.remove(tmp)            # a register workbook itself is never kept
+            if kind:
+                uid = db.insert("uploads", kind=kind, filename=os.path.basename(f.filename)[:200],
+                                sha256=hashlib.sha256(raw).hexdigest(), size=len(raw),
+                                label=result["data"].get("quarter", "") if kind == "F4" else "",
+                                status="staged", summary=db.dumps(result["summary"]), warnings=db.dumps(result["warnings"]),
+                                created_by=g.user["email"], created_at=db.now())
+                store.save(uid, result["data"])
+                auth.audit("upload_staged", f"{kind} #{uid} {f.filename}")
+                flash(pick(f"Recognised as the {store.KINDS[kind]}. Check the preview, then publish.",
+                           f"تم التعرف عليه: {store.KINDS_AR[kind]}. راجع المعاينة ثم انشر."), "ok")
+                return redirect(url_for("data_view", uid=uid))
+            # a document
+            meta = doc_form_meta(request.form)
+            meta["category"] = meta["category"] or library.guess_category(f.filename)
+            meta["visibility"] = meta["visibility"] or "kpmg"
+            parent = request.form.get("parent", type=int)
             try:
-                with os.fdopen(fd, "wb") as fh:
-                    fh.write(raw)
-                result = parse(kind, tmp, request.form.get("label", ""))
-            except ParseError as e:
-                auth.audit("upload_rejected", f"{kind} {f.filename}: {e}")
-                flash(f"{store.KINDS[kind]}: {e}", "error")
-                return redirect(url_for("data_page"))
-            finally:
-                if os.path.exists(tmp):
-                    os.remove(tmp)            # the workbook itself is never kept
-            uid = db.insert("uploads", kind=kind, filename=os.path.basename(f.filename)[:200],
-                            sha256=hashlib.sha256(raw).hexdigest(), size=len(raw),
-                            label=result["data"].get("quarter", "") if kind == "F4" else "",
-                            status="staged", summary=db.dumps(result["summary"]), warnings=db.dumps(result["warnings"]),
-                            created_by=g.user["email"], created_at=db.now())
-            store.save(uid, result["data"])
-            auth.audit("upload_staged", f"{kind} #{uid} {f.filename}")
-            return redirect(url_for("data_view", uid=uid))
-        ups = db.q("SELECT * FROM uploads WHERE status<>'discarded' ORDER BY id DESC LIMIT 60")
-        cur = {k: db.q1("SELECT * FROM uploads WHERE id=?", (uid,)) for k, uid in store.current_ids().items()}
-        try:
-            cd, ca, cs = candidates.build(store.current())
-            cand = dict(dec=len(cd), act=len(ca), skipped=cs)
-        except Exception:  # noqa: BLE001 - the upload page must open even if a dataset is incomplete
-            cand = None
-        return render_template("data.html", uploads=ups, current=cur, cand=cand)
+                doc_id, check, n = library.save(raw, f.filename, meta, g.user["email"], confirm=request.form.get("confirm") == "1",
+                                                parent=parent)
+            except library.LibraryError as e:
+                auth.audit("document_rejected", f"{f.filename}: {e}")
+                flash(str(e), "error")
+                form = request.form
+            else:
+                detail = f"#{doc_id} {meta['category']} {meta['visibility']} {f.filename}"
+                if check != "clean":
+                    detail += f" - uploader confirmed no patient identifiers ({check}, {n} matches)"
+                auth.audit("document_new_version" if parent else "document_uploaded", detail)
+                flash(pick("Saved as a document.", "تم الحفظ كمستند."), "ok")
+                return redirect(url_for("document_view", doc_id=doc_id))
+        admin = g.user["role"] == "admin"
+        ups = db.q("SELECT * FROM uploads WHERE status<>'discarded' ORDER BY id DESC LIMIT 60") if admin else []
+        cur = {k: db.q1("SELECT * FROM uploads WHERE id=?", (uid,)) for k, uid in store.current_ids().items()} if admin else {}
+        a = request.args
+        parent = db.q1("SELECT * FROM documents WHERE id=? AND status='active'", (a.get("parent", type=int),)) if a.get("parent") else None
+        pre = dict(parent) if parent else {}
+        if parent:
+            pre["links"] = library.links(parent["id"])
+        elif a.get("kind") and a.get("ref"):
+            pre = dict(links=[(a["kind"], a["ref"])], category=a.get("category", ""))
+        if form:
+            pre = dict(title=form.get("title", ""), category=form.get("category", ""), period=form.get("period", ""),
+                       description=form.get("description", ""), visibility=form.get("visibility", "kpmg"),
+                       links=doc_form_meta(form)["links"])
+        return render_template("data.html", uploads=ups, current=cur, admin=admin, pre=pre, parent=parent,
+                               open_doc=bool(parent or a.get("kind") or form), CATS=library.CATEGORIES, KINDS=library.LINK_KINDS,
+                               RKINDS=store.KINDS, RKINDS_AR=store.KINDS_AR,
+                               options=library.link_options(store.current()))
 
     @app.route("/data/<int:uid>", methods=["GET", "POST"])
     @auth.roles_required("admin")
@@ -452,6 +468,8 @@ def create_app():
             if act == "publish" and up["status"] in ("staged", "superseded"):
                 store.publish(uid, g.user["email"])
                 auth.audit("published", f"{up['kind']} #{uid}")
+                if up["kind"] in ("F1", "F2", "F3"):
+                    actions.record(uid, store.current())      # corrective-action statuses after this upload
                 flash(pick("Published. The dashboard now uses this version.", "تم النشر. تستخدم اللوحة هذه النسخة الآن."), "ok")
             elif act == "discard" and up["status"] == "staged":
                 store.discard(uid)
@@ -468,19 +486,11 @@ def create_app():
         return Response(governance_template(), mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers={"Content-Disposition": "attachment; filename=MARSAD_Project_Delivery_Register_template.xlsx"})
 
-    @app.route("/data/candidates.xlsx")
-    @auth.roles_required("admin")
-    def candidates_xlsx():
-        body, nd, na, skipped = candidates.to_xlsx(store.current())
-        auth.audit("download_candidates", f"{nd} decision and {na} action candidates; {skipped} already in F6")
-        return Response(body, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        headers={"Content-Disposition": f"attachment; filename=F6_candidates_{dt.date.today()}.xlsx"})
-
     @app.route("/data/template/corrective-actions.xlsx")
     @auth.roles_required("admin")
     def corrective_xlsx():
         return Response(corrective_template(), mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        headers={"Content-Disposition": "attachment; filename=MARSAD_Governance_Corrective_Actions_Register_template.xlsx"})
+                        headers={"Content-Disposition": "attachment; filename=MARSAD_Governance_Register_Policy_and_Decisions_template.xlsx"})
 
     # ------------------------------------------------------------------ period close (admin)
     @app.route("/periods", methods=["GET", "POST"])
@@ -495,7 +505,7 @@ def create_app():
                 for lg in ("en", "ar"):
                     g.lang = lg
                     ctx = kpi.Ctx(data, month, "", internal=False)
-                    ctx.meta = {"F6": actions.meta()}
+                    ctx.meta = {"F1": actions.meta()}
                     res = {}
                     for p in config.PAGES:
                         res.update(kpi.compute_page(p["code"], ctx))
