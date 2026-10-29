@@ -1,8 +1,8 @@
 # MARSAD Insights: deployment and operating guide
 
-Version 1.2 · 28 October 2026 · KPI dictionary v0.3 · disputes tracker v1.0
+Version 1.4 · 29 October 2026 · KPI dictionary v0.4 · disputes tracker v1.0
 
-MARSAD Insights is the stakeholder dashboard for the CNHI audit and approval project. It is a separate application from MARSAD live, with its own link and user list. You keep working in your Excel workbooks; you upload them to the dashboard, it checks them, and you publish. The dashboard then shows the 55 KPIs on seven bilingual pages (English and Arabic).
+MARSAD Insights is the stakeholder dashboard for the CNHI audit and approval project. It is a separate application from MARSAD live, with its own link and user list. You keep working in your Excel workbooks; you upload them to the dashboard, it checks them, and you publish. The dashboard then shows the 64 KPIs on eight bilingual pages (English and Arabic).
 
 ---
 
@@ -14,7 +14,7 @@ MARSAD Insights is the stakeholder dashboard for the CNHI audit and approval pro
 | Storage | One SQLite file plus de-identified datasets, all under the data folder (`/data`) |
 | Uploaded workbooks | Read once, then deleted. Only de-identified figures are kept. |
 | Charts | Drawn on the server; nothing is loaded from the internet |
-| Sign-in | Email and password, plus an authenticator-app code (MFA), 8-hour sessions, lockout after 5 failed attempts |
+| Sign-in | Email and password, plus an authenticator-app code (MFA, set up by scanning a QR code), 8-hour sessions, lockout after 5 failed attempts |
 
 Roles:
 
@@ -22,7 +22,7 @@ Roles:
 |---|---|
 | Administrator | Upload and publish workbooks, close months, manage users, view the audit log. This is you. |
 | KPMG viewer | All pages, including per-reviewer figures |
-| CNHI viewer | All pages without per-reviewer figures. Give this role to the CFO and other CNHI users. |
+| CNHI viewer | All pages without per-reviewer figures and without the two KPMG-only tiles (OP-08 team deployed, OP-09 output per person-day). Give this role to the CFO and other CNHI users. |
 
 ---
 
@@ -66,7 +66,7 @@ Choose one of the two routes.
 | `kpmg@demo.local` | KPMG viewer |
 | `cfo@demo.local` | CNHI viewer (CFO view) |
 
-The password for all three is `Demo@Insights2026`.
+The password for all three is `Demo@Insights2026`. At the first sign-in, scan the QR code with an authenticator app and enter the 6-digit code (see 4.4). The free plan keeps no disk, so after a restart each demo account scans again.
 
 On the free plan, the service sleeps after 15 minutes without visits, so the first visit afterwards takes about a minute. A restart or a redeploy reloads fresh demo data.
 
@@ -104,7 +104,13 @@ curl -s http://127.0.0.1:8000/health          # {"status": "ok"}
 ### 4.4 First sign-in
 
 1. Open the site and sign in with the administrator email and temporary password.
-2. Scan or type the key into an authenticator app (Microsoft Authenticator or Google Authenticator).
+2. Set up two-step sign-in. The screen shows a QR code:
+   - **Phone and computer:** in Microsoft Authenticator or Google Authenticator, choose Add account, then scan the QR code on the computer screen.
+   - **Signing in on the same phone or iPad:** press "Open in the authenticator app"; the app adds the account directly.
+   - **If neither works:** open "Can't scan? Enter the key instead" and type the key (account name MARSAD Insights, time-based).
+   - Enter the 6-digit code the app shows. If it is refused, check that the phone's clock is set automatically.
+
+   Every new user goes through the same screen at first sign-in, and again after an administrator presses **Reset MFA** (Users page).
 3. Set your own password when asked.
 4. Remove `MARSAD_ADMIN_PASSWORD` from `insights.env`, then run `docker compose up -d`.
 
@@ -140,7 +146,7 @@ Data and users stay in the volume. Database changes apply automatically on start
 | F2 | MARSAD GSS Assurance Workbook (.xlsm) | GSS page and the claims headline (EX-05, EX-09) |
 | F4 | Quarterly accounting report (.xlsx). Enter the quarter (for example `2026-Q1`) if the sheet names do not show it. | Financial page |
 | F3 | CNHI Hospital Disputes Tracker v1.0 (blank copy on the upload page; see section 7a) | Disputes page, EX-07 and EX-08 |
-| F5 | Governance register (template on the upload page) | Governance page, EX-10, FW-08 |
+| F5 | Governance register (template on the upload page) | Governance page, KPMG delivery & effort page, EX-10, FW-08 |
 
 3. **Check the preview** after each upload. It shows what was read and lists any problems, such as a skipped row, an unknown flag code or a missing optional column. Then press **Publish**. To go back, open an older upload and press **Roll back to this version**.
 4. **Close a month** (Administration → Close a month) when CNHI approves that month's report. Its figures are then frozen and marked **Approved**. The current month stays **Provisional**. Reopen a month only to restate it, and record why in the note.
@@ -153,7 +159,7 @@ Data and users stay in the volume. Database changes apply automatically on start
 |---|---|---|
 | Daily or weekly | Save the daily register and upload F1; upload F2 after GSS reports are issued | About 2 minutes |
 | Weekly, and after each opinion batch | Update and upload the disputes tracker (F3) | 1 minute |
-| Monthly | Update and upload the governance register (F5); close the month once CNHI approves the report | 5 minutes |
+| Monthly | Update the governance register (F5), including Team effort and CNHI requests, and upload it; close the month once CNHI approves the report | 10 minutes |
 | Quarterly | Upload the accounting report (F4) | 2 minutes |
 
 Everything else is calculated: de-identification, KPIs, charts, both languages.
@@ -207,6 +213,34 @@ The Almodawat source file contains patient names and national IDs. They were not
 
 ---
 
+## 7b. KPMG delivery & effort page (from the governance register)
+
+Download a fresh governance register from the upload page: it now has three more sheets. If you already keep a register, copy these sheets into it; the upload finds them by name.
+
+| Sheet | Fill in | When |
+|---|---|---|
+| Contract | Contract start date (yellow). Duration (24 months), 3 physicians, 1 finance consultant and 8 hours per person-day are prefilled. | Once |
+| Team effort | One row per workstream and role each month: person-days. Roles: Physician, Finance consultant, Additional KPMG support (anyone outside the contracted team: management, QA, specialists). | Monthly, about 5 minutes |
+| CNHI requests | One row per ad-hoc request from CNHI: date received, requesting unit (never a person's name), type, due and delivered dates, hours, status | As requests arrive |
+
+Workstreams: MARSAD daily review (approvals and claims), GSS claims assurance, Hospital disputes, Financial and accounting review, Reporting and governance, CNHI ad-hoc requests.
+
+| KPI | Shows | Who sees it |
+|---|---|---|
+| OP-01 | Work delivered: encounters reviewed, GSS claims sampled and reports issued, disputes answered, deliverables submitted; this month and contract to date | Everyone |
+| OP-02 | Findings and value identified per workstream (never added together; identified, not recovered) | Everyone |
+| OP-03 | Person-days by workstream | Everyone (the FTE equivalent shows to KPMG users only) |
+| OP-04 | Medical vs financial effort against the 80/20 operating model and the 3:1 contracted team | Everyone |
+| OP-05 | Additional work: disputes and CNHI requests, plus KPMG support outside the contracted team, as a share of total effort | Everyone |
+| OP-06 | CNHI requests received, delivered, open, and median working days | Everyone |
+| OP-07 | Month *n* of 24 and contractual deliverables submitted against the contract total | Everyone |
+| OP-08 | Team deployed (FTE) against 3 physicians + 1 finance consultant | KPMG users only |
+| OP-09 | Cases reviewed per person-day, by workstream | KPMG users only |
+
+FTE equivalent = person-days ÷ working days in the month (Sunday to Thursday; holidays and leave are not deducted). Dispute hours in the disputes tracker are shown in OP-05 for reference only; the person-days in Team effort are the figure that counts.
+
+---
+
 ## 8. Settings you may change
 
 | File | What |
@@ -251,14 +285,14 @@ Decisions D-18 to D-21 are built as recommended: review coverage on the CFO page
 ```
 app.py                 routes: sign-in, pages, uploads, month close, users, audit
 insights/parsers.py    reads the five workbooks (columns found by header name)
-insights/kpi.py        the 55 KPI calculations
+insights/kpi.py        the 64 KPI calculations
 insights/deid.py       hashing and pseudonyms
 insights/store.py      versioned datasets, publish and roll back
 insights/auth.py       passwords, MFA, roles, CSRF
 insights/charts.py     SVG charts
 insights/theme.py      colours, icons and sparklines (Option A, 'Vibrant tiles')
 insights/i18n.py       English and Arabic screen text
-config/kpis.yaml       KPI dictionary v0.3
+config/kpis.yaml       KPI dictionary v0.4
 config/settings.yaml   editable settings
 templates/, static/    screens and styles; static/fonts holds IBM Plex Sans Arabic (SIL Open Font License, OFL.txt)
 seed_demo.py           synthetic demo data (preview only)

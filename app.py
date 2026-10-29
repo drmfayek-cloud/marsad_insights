@@ -81,7 +81,10 @@ def create_app():
         if request.method == "POST":
             email = request.form.get("email", "").strip()
             u = db.q1("SELECT * FROM users WHERE email=? AND active=1", (email,))
+            keep = session.get("lang")
             session.clear()
+            if keep:
+                session["lang"] = keep             # a language chosen on the sign-in page carries through MFA
             if u is None or auth.is_locked(u) or not auth.check_pw(request.form.get("password", ""), u["pw_hash"]):
                 if u is not None and not auth.is_locked(u):
                     auth.register_failure(u)
@@ -101,10 +104,11 @@ def create_app():
         return render_template("login.html", demo_users=demo_users())
 
     def finish_login(u):
-        nxt = session.get("next")
+        nxt, chosen = session.get("next"), session.get("lang")
         session.clear()
-        session.update(uid=u["id"], full=True, at=dt.datetime.now().timestamp(), lang=u["lang"] or "en")
-        db.update("users", u["id"], last_login=db.now())
+        lg = chosen or u["lang"] or "en"
+        session.update(uid=u["id"], full=True, at=dt.datetime.now().timestamp(), lang=lg)
+        db.update("users", u["id"], last_login=db.now(), lang=lg)
         g.user = u
         auth.audit("login")
         return redirect(nxt or url_for("page", slug="executive"))
@@ -139,13 +143,17 @@ def create_app():
             flash(pick("The code did not match. Check the phone's clock and try the next code.",
                        "الرمز غير مطابق. تحقق من ساعة الهاتف وجرب الرمز التالي."), "error")
         grouped = " ".join(secret[i:i + 4] for i in range(0, len(secret), 4))
-        return render_template("mfa_setup.html", secret=grouped, uri=auth.otpauth_uri(secret, u["email"]))
+        uri = auth.otpauth_uri(secret, u["email"])
+        return render_template("mfa_setup.html", secret=grouped, uri=uri, qr=auth.qr_svg(uri), email=u["email"])
 
     @app.route("/logout")
     def logout():
         if g.user:
             auth.audit("logout")
+        keep = session.get("lang")
         session.clear()
+        if keep:
+            session["lang"] = keep
         return redirect(url_for("login"))
 
     @app.route("/lang/<code>")
@@ -208,7 +216,9 @@ def create_app():
             trend = kpi.exec_trend(kpi.Ctx(data, "all", tpa), selected=period)
             hist = kpi.history([k["id"] for k in config.kpis_for("EX")], data, period, tpa)
             sparks = {k: theme.sparkline(v, theme.style(k)[0]) for k, v in hist.items()}
-        defs = config.kpis_for(pg["code"])
+        internal = g.user["role"] in auth.INTERNAL
+        defs = [k for k in config.kpis_for(pg["code"]) if internal or k.get("audience") != "kpmg"]   # KPMG-only tiles
+        results = {k: v for k, v in results.items() if k in {d["id"] for d in defs}}
         return render_template("page.html", pg=pg, defs=defs, results=results, months=ms, period=period, tpa=tpa,
                                tpas=tpa_list, badge=badge, snap=snap, trend=trend, sparks=sparks, has_data=bool(data),
                                as_of=data_as_of())

@@ -23,6 +23,9 @@ KPI_STYLE = {
     "FW-05": ("indigo", "funnel"), "FW-06": ("teal", "tree"), "FW-07": ("pink", "repeat"), "FW-08": ("blue", "bulb"),
     "GV-01": ("teal", "doc"), "GV-02": ("green", "stamp"), "GV-03": ("blue", "clock"), "GV-04": ("indigo", "check"),
     "GV-05": ("violet", "people"), "GV-06": ("amber", "bulb"),
+    "OP-01": ("teal", "check"), "OP-02": ("amber", "coin"), "OP-03": ("indigo", "layers"), "OP-04": ("blue", "scale"),
+    "OP-05": ("violet", "people"), "OP-06": ("green", "send"), "OP-07": ("pink", "calendar"), "OP-08": ("coral", "gauge"),
+    "OP-09": ("teal", "pulse"),
 }
 
 # Category labels that carry meaning get a fixed colour wherever they appear (charts, legends).
@@ -33,6 +36,7 @@ SEMANTIC = {
     "No issue identified": "green", "Documentation gap": "amber", "Clinical concern": "coral",
     "Financial discrepancy": "violet", "Insufficient information": "blue",
     "Error": "blue", "Waste": "amber", "Abuse": "coral", "Suspected fraud": "pink",
+    "Medical and operational review": "teal", "Financial and accounting review": "indigo",
     "Endorse - route to TPA": "green", "Endorse – route to TPA": "green", "Not endorsed": "coral",
 }
 

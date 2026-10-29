@@ -13,6 +13,14 @@ TYPES = {"ELG": "Eligibility not confirmed", "EMG": "Emergency criteria not met"
          "DQ": "Data inconsistent", "CLM": "Billed above authorised amount"}
 
 
+
+def _valid(y, m, d):
+    try:
+        dt.date(y, m, d)
+        return True
+    except ValueError:
+        return False
+
 def _days(start, end):
     d = start
     while d <= end:
@@ -151,7 +159,32 @@ def build(today=None):
                planned=(start + dt.timedelta(days=20 * i)).isoformat(),
                delivered=(start + dt.timedelta(days=20 * i + 2)).isoformat() if start + dt.timedelta(days=20 * i + 2) < today else None)
           for i in range(1, 7)]
-    f5 = dict(deliverables=deliv, meetings=meet, recommendations=recs, kt=kt)
+    # team effort (monthly person-days by workstream and role), CNHI requests and the contract baseline
+    effort, reqs = [], []
+    m = start
+    while m <= today:
+        mk = m.strftime("%Y-%m")
+        wd = sum(1 for d in range(1, 32) if _valid(m.year, m.month, d) and dt.date(m.year, m.month, d).weekday() not in (4, 5))
+        phys = 3 * wd * r.uniform(0.9, 0.98)
+        split = [("MARSAD daily review (approvals and claims)", 0.62), ("GSS claims assurance", 0.16), ("Hospital disputes", 0.08),
+                 ("Reporting and governance", 0.08), ("CNHI ad-hoc requests", 0.06)]
+        for ws_, share in split:
+            effort.append(dict(workstream=ws_, role="Physician", month=mk, days=round(phys * share, 1)))
+        fin = wd * r.uniform(0.9, 1.0)
+        effort.append(dict(workstream="Financial and accounting review", role="Finance consultant", month=mk, days=round(fin * 0.85, 1)))
+        effort.append(dict(workstream="Reporting and governance", role="Finance consultant", month=mk, days=round(fin * 0.15, 1)))
+        effort.append(dict(workstream="Reporting and governance", role="Additional KPMG support", month=mk, days=round(r.uniform(3, 6), 1)))
+        effort.append(dict(workstream="Hospital disputes", role="Additional KPMG support", month=mk, days=round(r.uniform(1, 3), 1)))
+        for i in range(r.randint(2, 5)):
+            rec = m + dt.timedelta(days=r.randint(0, 20))
+            dlv = rec + dt.timedelta(days=r.randint(1, 6))
+            reqs.append(dict(id=f"Q{len(reqs) + 1:03d}", received=rec.isoformat(), unit=r.choice(["CNHI Finance", "CNHI Claims", "CNHI PFPS"]),
+                             type=r.choice(["Data extract or analysis", "Case review", "Report or presentation", "Meeting or workshop"]),
+                             due=(rec + dt.timedelta(days=4)).isoformat(), delivered=dlv.isoformat() if dlv < today else None,
+                             hours=r.choice([3, 4, 6, 8, 12]), status="Delivered" if dlv < today else "Open"))
+        m = (m.replace(day=28) + dt.timedelta(days=5)).replace(day=1)
+    contract = dict(start=start.isoformat(), months=24, physicians=3, finance=1, hours_per_day=8)
+    f5 = dict(deliverables=deliv, meetings=meet, recommendations=recs, kt=kt, effort=effort, requests=reqs, contract=contract)
     return {"F1": f1, "F2": f2, "F3": f3, "F4": f4, "F5": f5}
 
 

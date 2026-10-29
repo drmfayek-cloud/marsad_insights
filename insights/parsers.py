@@ -482,6 +482,23 @@ def parse_f4(path, label=""):
 
 
 # ------------------------------------------------------------------ F5 governance register
+MONTH_FORMATS = ("%Y-%m", "%b-%Y", "%b %Y", "%B %Y", "%B-%Y", "%m/%Y", "%Y/%m")
+
+
+def to_month(v):
+    """A month typed as a date, '2026-10', 'Oct-2026' or '10/2026' -> '2026-10'."""
+    d = to_date(v)
+    if d:
+        return d[:7]
+    txt = to_text(v)
+    for f in MONTH_FORMATS:
+        try:
+            return dt.datetime.strptime(txt, f).strftime("%Y-%m")
+        except ValueError:
+            pass
+    return ""
+
+
 def parse_f5(path):
     wb = open_book(path)
     warn = []
@@ -513,10 +530,35 @@ def parse_f5(path):
         "implemented": ("Implemented date", "d")})
     kt = rows("Knowledge transfer", ["Item", "Planned date"], {
         "item": ("Item", "t"), "type": ("Type", "t"), "planned": ("Planned date", "d"), "delivered": ("Delivered date", "d")})
+    effort = []
+    for e in rows("Team effort", ["Workstream", "Person-days"], {
+            "workstream": ("Workstream", "t"), "role": ("Role", "t"), "month": ("Month", "t"), "days": ("Person-days", "n")}):
+        e["month"] = to_month(e["month"])
+        if not e["month"] or not e["days"]:
+            warn.append(f"Team effort: a row for '{e['workstream'] or '-'}' has no month or no person-days; it was skipped.")
+            continue
+        effort.append(e)
+    requests = rows("CNHI requests", ["Request ID", "Date received"], {
+        "id": ("Request ID", "t"), "received": ("Date received", "d"), "unit": ("Requesting unit", "t"),
+        "type": ("Request type", "t"), "due": ("Due date", "d"), "delivered": ("Delivered date", "d"),
+        "hours": ("Hours", "n"), "status": ("Status", "t")})
+    contract = {}
+    ws = find_sheet(wb, "Contract", required=False)
+    if ws is not None:
+        keys = {"contract start date": "start", "contract duration (months)": "months", "physicians (fte)": "physicians",
+                "finance consultants (fte)": "finance", "hours per person-day": "hours_per_day"}
+        for r in ws.iter_rows(min_row=5, max_row=40, max_col=2, values_only=True):
+            k = keys.get(norm(r[0])) if r and r[0] else None
+            if k:
+                contract[k] = to_date(r[1]) if k == "start" else to_num(r[1])
+    if not contract.get("start"):
+        warn.append("Contract sheet: the contract start date is blank; contract-to-date figures start from the earliest data.")
     summary = {"Deliverables": len(deliverables), "Meetings": len(meetings), "Recommendations": len(recs),
-               "Knowledge-transfer items": len(kt)}
-    return dict(data=dict(deliverables=deliverables, meetings=meetings, recommendations=recs, kt=kt),
-                summary=summary, warnings=warn)
+               "Knowledge-transfer items": len(kt), "Team effort rows": len(effort),
+               "Person-days recorded": round(sum(e["days"] for e in effort), 1), "CNHI requests": len(requests),
+               "Contract start": contract.get("start") or "-"}
+    return dict(data=dict(deliverables=deliverables, meetings=meetings, recommendations=recs, kt=kt, effort=effort,
+                          requests=requests, contract=contract), summary=summary, warnings=warn)
 
 
 PARSERS = {"F1": parse_f1, "F2": parse_f2, "F3": parse_f3, "F4": parse_f4, "F5": parse_f5}

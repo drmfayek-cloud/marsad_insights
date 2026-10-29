@@ -2,17 +2,24 @@
 {% block auth %}
 <div class="authcard">
   <h1>{{ pick('Set up two-step sign-in', 'إعداد التحقق بخطوتين') }}</h1>
-  <ol class="small">
-    <li>{{ pick('Open an authenticator app (Microsoft Authenticator, Google Authenticator) and choose "add account", then "enter a setup key".',
-              'افتح تطبيق المصادقة واختر إضافة حساب ثم إدخال مفتاح الإعداد.') }}</li>
-    <li>{{ pick('Account name: MARSAD Insights. Key (time-based):', 'اسم الحساب: MARSAD Insights. المفتاح (مبني على الوقت):') }}
-      <div class="secret">{{ secret }}</div></li>
-    <li>{{ pick('Enter the 6-digit code the app shows.', 'أدخل الرمز المكون من 6 أرقام الذي يظهره التطبيق.') }}</li>
+  <ol class="small steps">
+    <li>{{ pick('Install an authenticator app on your phone, for example Microsoft Authenticator or Google Authenticator.',
+              'ثبّت تطبيق مصادقة على هاتفك، مثل Microsoft Authenticator أو Google Authenticator.') }}</li>
+    <li>{{ pick('In the app, add an account and scan this QR code.', 'من التطبيق، أضف حسابا وامسح رمز QR التالي.') }}</li>
   </ol>
-  <details class="small"><summary>{{ pick('Setup link (for apps that accept it)', 'رابط الإعداد') }}</summary><code class="wrap">{{ uri }}</code></details>
+  {% if qr %}
+  <div class="qrbox">{{ qr }}</div>
+  <p class="small muted center">{{ pick('Account', 'الحساب') }}: MARSAD Insights · <span dir="ltr">{{ email }}</span></p>
+  {% endif %}
+  <a class="btn ghost full" href="{{ uri }}">{{ pick('Setting up on this phone? Open in the authenticator app', 'تعمل من نفس الهاتف؟ افتح في تطبيق المصادقة') }}</a>
+  <details class="small"{% if not qr %} open{% endif %}><summary>{{ pick("Can't scan? Enter the key instead", 'لا يمكنك المسح؟ أدخل المفتاح يدويا') }}</summary>
+    <p>{{ pick('Choose "enter a setup key", account name MARSAD Insights, time-based, then type:', 'اختر "إدخال مفتاح الإعداد"، اسم الحساب MARSAD Insights، مبني على الوقت، ثم اكتب:') }}</p>
+    <div class="secret">{{ secret }}</div>
+  </details>
   <form method="post">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-    <label>{{ t('code') }}<input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required></label>
+    <label>{{ pick('3. Enter the 6-digit code the app shows', '3. أدخل الرمز المكون من 6 أرقام الذي يظهره التطبيق') }}
+      <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9 ]{6,7}" required autofocus></label>
     <button class="btn primary">{{ pick('Confirm and sign in', 'تأكيد وتسجيل الدخول') }}</button>
   </form>
 </div>

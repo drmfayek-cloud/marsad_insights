@@ -14,6 +14,8 @@ services:
         value: "1"
       - key: MARSAD_HTTPS
         value: "1"
+      - key: MARSAD_REQUIRE_MFA          # QR-code MFA on the preview too; enrolment resets when the free service restarts
+        value: "1"
       - key: MARSAD_SECRET_KEY
         generateValue: true
       - key: MARSAD_HASH_KEY

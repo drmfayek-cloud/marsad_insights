@@ -84,6 +84,12 @@
     <div class="card wide t-indigo"><h3 class="ctitle">{{ pick('Finding rate in reviewed encounters', 'نسبة الحالات ذات الملاحظات') }}</h3><div class="chartbox">{{ trend.rate }}</div>
       <p class="small muted">{{ pick('Encounters are screened against risk rules; the rate is not an error rate for all approvals (D-08).', 'تخضع الحالات لقواعد المخاطر، فلا تمثل النسبة معدل خطأ لكل الموافقات.') }}</p></div>
   </div>{% endif %}
+{% elif pg.sections %}
+  {% for sec in pg.sections %}{% set ks = defs|selectattr('section', 'equalto', sec.key)|list %}{% if ks %}
+  <h2 class="sect">{{ pick(sec.en, sec.ar) }}</h2>
+  <div class="grid{{ ' internal' if sec.key == 'internal' }}">
+    {% for k in ks %}{{ kpi_card(k, results[k.id]) }}{% endfor %}
+  </div>{% endif %}{% endfor %}
 {% else %}
   <div class="grid">
     {% for k in defs %}{{ kpi_card(k, results[k.id]) }}{% endfor %}

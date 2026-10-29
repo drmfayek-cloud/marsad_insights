@@ -11,6 +11,7 @@ import time
 from urllib.parse import quote
 
 from flask import abort, g, redirect, request, session, url_for
+from markupsafe import Markup
 
 from . import db
 
@@ -79,8 +80,25 @@ def check_totp(secret, code):
     return any(hmac.compare_digest(totp(secret, t + w * 30), code) for w in (-1, 0, 1))
 
 
+ISSUER = "MARSAD Insights"
+
+
 def otpauth_uri(secret, email):
-    return f"otpauth://totp/{quote('MARSAD Insights')}:{quote(email)}?secret={secret}&issuer={quote('MARSAD Insights')}"
+    label = f"{quote(ISSUER)}:{quote(email, safe='@')}"
+    return f"otpauth://totp/{label}?secret={secret}&issuer={quote(ISSUER)}&algorithm=SHA1&digits=6&period=30"
+
+
+def qr_svg(text):
+    """The setup link as an inline SVG QR code (black on white so phone cameras read it in dark mode too).
+    Returns None if the segno package is missing; the page then shows the typed key only."""
+    try:
+        import segno
+    except ImportError:
+        return None
+    qr = segno.make(text, error="m", micro=False)
+    svg = qr.svg_inline(scale=5, border=4, dark="#000000", light="#ffffff", omitsize=True,   # viewBox only: CSS sets the size
+                        svgclass="qr", lineclass=None)
+    return Markup(svg.replace("<svg ", '<svg role="img" aria-label="QR code" ', 1))
 
 
 # ------------------------------------------------------------------ session helpers

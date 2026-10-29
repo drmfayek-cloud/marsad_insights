@@ -1,11 +1,20 @@
-# KPI dictionary v0.3 (28 October 2026) - generated from CNHI_Dashboard_KPI_Dictionary_v0.3.xlsx.
+# KPI dictionary v0.4 (29 October 2026; v0.3 plus OP-01 to OP-09) - generated from CNHI_Dashboard_KPI_Dictionary_v0.3.xlsx.
 # Edit wording here; the dashboard reads names, definitions and caveats from this file. Calculations live in insights/kpi.py.
-version: '0.3'
+version: '0.4'
 pages:
 - code: EX
   slug: executive
   en: Executive overview
   ar: النظرة التنفيذية
+- code: OP
+  slug: delivery
+  en: KPMG delivery & effort
+  ar: إنجازات وجهد فريق KPMG
+  sections:
+  - {key: delivered, en: Work delivered and value identified, ar: الأعمال المنجزة والقيم المحددة}
+  - {key: effort, en: Effort and additional work, ar: الجهد والعمل الإضافي}
+  - {key: responsive, en: Responsiveness and contract progress, ar: الاستجابة وتقدم العقد}
+  - {key: internal, en: KPMG only - capacity and output, ar: لفريق KPMG فقط - الطاقة والإنتاجية}
 - code: DR
   slug: daily-review
   en: MARSAD daily review
@@ -1147,3 +1156,194 @@ kpis:
   target: '-'
   caveat: Supports CNHI's ability to sustain the methodology after the project.
   decisions: ''
+- id: OP-01
+  page: OP
+  tier: 2
+  placement: Page
+  section: delivered
+  name_en: Work delivered
+  name_ar: الأعمال المنجزة
+  def_en: 'Case-level reviews completed across the workstreams in the month and since the contract started: encounters reviewed in the daily review, claims sampled in GSS reports issued, and hospital disputes answered; with GSS reports issued and deliverables submitted.'
+  def_ar: 'المراجعات المنجزة على مستوى الحالة في جميع المسارات خلال الشهر ومنذ بداية العقد: الحالات المراجعة يوميا، والمطالبات المراجعة في تقارير GSS الصادرة، والاعتراضات التي تم الرد عليها؛ مع تقارير GSS الصادرة والمخرجات المسلمة.'
+  formula: Encounters reviewed (DR) + claims sampled in issued GSS reports + disputes with a KPMG opinion
+  unit: Count
+  date_basis: Activity date of each stream (D-01)
+  counting_unit: Case
+  source: F1, F2, F3, F5
+  source_columns: 'Daily Intake: Reviewed; GSS Register: issued, sampled; Disputes: KPMG opinion date; Deliverables: Submitted date'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Streams review different cases, so they add up without overlap. Contract to date starts at the contract start date.
+  decisions: D-22
+- id: OP-02
+  page: OP
+  tier: 2
+  placement: Page
+  section: delivered
+  name_en: Findings and value identified
+  name_ar: الملاحظات والقيم المحددة
+  def_en: Encounters with a confirmed finding, and the SAR value identified by each workstream in the month and since the contract started.
+  def_ar: الحالات التي عليها ملاحظة مؤكدة، والقيمة بالريال التي حددها كل مسار خلال الشهر ومنذ بداية العقد.
+  formula: Each value as in EX-04, EX-05 (daily claims part), GS-05 and HD-05; recommendations accepted as in FW-08
+  unit: Count / SAR
+  date_basis: Activity date of each stream
+  counting_unit: Encounter / claim
+  source: F1, F2, F3, F5
+  source_columns: As in the source KPIs
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Values are shown by stream and never added together (D-04, D-17). They are values identified, not cash recovered.
+  decisions: D-22
+- id: OP-03
+  page: OP
+  tier: 2
+  placement: Page
+  section: effort
+  name_en: Effort by workstream
+  name_ar: الجهد حسب المسار
+  def_en: Person-days the KPMG team spent in the period, by workstream, with the full-time equivalent.
+  def_ar: أيام العمل التي بذلها فريق KPMG خلال الفترة حسب المسار، وما يعادلها من موظفين بدوام كامل.
+  formula: SUM(Person-days) by workstream; FTE equivalent = person-days / working days in the period
+  unit: Person-days
+  date_basis: Month of effort
+  counting_unit: Person-day
+  source: F5 Governance register (sheets Team effort, CNHI requests, Contract)
+  source_columns: 'Team effort: Workstream, Role, Month, Person-days'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Monthly totals entered by KPMG, no individual timesheets. Not split by TPA.
+  decisions: D-22
+- id: OP-04
+  page: OP
+  tier: 2
+  placement: Page
+  section: effort
+  name_en: Medical and financial effort mix
+  name_ar: توزيع الجهد بين المراجعة الطبية والمالية
+  def_en: Share of review effort on medical and operational review against financial and accounting review, compared with the 80/20 operating model and the contracted team (3 physicians, 1 finance consultant).
+  def_ar: نسبة جهد المراجعة الطبية والتشغيلية مقابل المراجعة المالية والمحاسبية، مقارنة بالنموذج التشغيلي 80/20 والفريق المتعاقد عليه (3 أطباء ومستشار مالي).
+  formula: Person-days (daily review + GSS + disputes) / (those + financial review)
+  unit: '%'
+  date_basis: Month of effort
+  counting_unit: Person-day
+  source: F5 Governance register (sheets Team effort, CNHI requests, Contract)
+  source_columns: 'Team effort: Workstream, Person-days'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Reporting, governance and CNHI requests are shared work and left out of the mix.
+  decisions: D-22
+- id: OP-05
+  page: OP
+  tier: 2
+  placement: Page
+  section: effort
+  name_en: Additional work beyond the routine scope
+  name_ar: العمل الإضافي خارج النطاق الاعتيادي
+  def_en: Person-days on hospital disputes and CNHI ad-hoc requests, plus effort from KPMG staff outside the contracted team, and their share of total effort.
+  def_ar: أيام العمل على اعتراضات المستشفيات وطلبات المركز الإضافية، والجهد المقدم من موظفي KPMG خارج الفريق المتعاقد عليه، ونسبتها من إجمالي الجهد.
+  formula: Person-days (Hospital disputes + CNHI ad-hoc requests by the contracted team) + person-days of Additional KPMG support
+  unit: Person-days
+  date_basis: Month of effort
+  counting_unit: Person-day
+  source: F5 Governance register (sheets Team effort, CNHI requests, Contract); F3 Actions hours for reference
+  source_columns: 'Team effort: Workstream, Role, Person-days'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Visible to CNHI (D-15). Dispute hours in the disputes tracker are shown for reference and not added again.
+  decisions: D-22
+- id: OP-06
+  page: OP
+  tier: 2
+  placement: Page
+  section: responsive
+  name_en: CNHI requests answered
+  name_ar: طلبات المركز التي تمت الاستجابة لها
+  def_en: Ad-hoc requests received from CNHI in the period, how many were delivered, how many remain open, and the median working days to deliver.
+  def_ar: الطلبات الإضافية الواردة من المركز خلال الفترة، وعدد ما تم تسليمه، وما زال مفتوحا، ووسيط أيام العمل حتى التسليم.
+  formula: COUNT(received in period); COUNT(delivered in period); MEDIAN(working days received to delivered)
+  unit: Count
+  date_basis: Date received / delivered
+  counting_unit: Request
+  source: F5 Governance register (sheets Team effort, CNHI requests, Contract)
+  source_columns: 'CNHI requests: Date received, Request type, Due date, Delivered date, Hours, Status'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Requesting unit only, never a person's name. Cancelled requests are left out.
+  decisions: D-22
+- id: OP-07
+  page: OP
+  tier: 2
+  placement: Page
+  section: responsive
+  name_en: Contract progress
+  name_ar: تقدم العقد
+  def_en: Month of the 24-month contract reached, and contractual deliverables submitted to date against the contract total.
+  def_ar: الشهر الذي بلغه العقد من 24 شهرا، والمخرجات التعاقدية المسلمة حتى تاريخه مقابل إجمالي العقد.
+  formula: Months from the contract start to the period end; COUNT(deliverables submitted to date) by type vs duration-based totals
+  unit: '% of contract term'
+  date_basis: Period end
+  counting_unit: Deliverable
+  source: F5 Governance register (sheets Team effort, CNHI requests, Contract)
+  source_columns: 'Contract: start date, duration; Deliverables: type, Submitted date; Knowledge transfer'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: 'Contract totals: one monthly report per month, one quarterly report per quarter, one annual report per year.'
+  decisions: D-22
+- id: OP-08
+  page: OP
+  tier: 2
+  placement: Page
+  section: internal
+  name_en: Team deployed against contract
+  name_ar: الفريق المنتشر مقارنة بالعقد
+  def_en: Full-time equivalent of the contracted roles deployed in the period, against the contracted 3 physicians and 1 finance consultant.
+  def_ar: ما يعادل الدوام الكامل للأدوار المتعاقد عليها خلال الفترة، مقارنة بـ 3 أطباء ومستشار مالي متعاقد عليهم.
+  formula: Person-days by role / working days in the period, vs the Contract sheet
+  unit: FTE
+  date_basis: Month of effort
+  counting_unit: Person-day
+  source: F5 Governance register (sheets Team effort, CNHI requests, Contract)
+  source_columns: 'Team effort: Role, Month, Person-days; Contract: Physicians (FTE), Finance consultants (FTE)'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: KPMG users only. Working days exclude Friday and Saturday, not official holidays or leave.
+  decisions: D-22
+  audience: kpmg
+- id: OP-09
+  page: OP
+  tier: 2
+  placement: Page
+  section: internal
+  name_en: Review output per person-day
+  name_ar: إنتاجية المراجعة لكل يوم عمل
+  def_en: Cases reviewed per person-day of the contracted team on each review workstream.
+  def_ar: الحالات المراجعة لكل يوم عمل للفريق المتعاقد عليه في كل مسار مراجعة.
+  formula: Workstream output (OP-01) / person-days of the contracted roles on that workstream
+  unit: Cases per person-day
+  date_basis: Month
+  counting_unit: Person-day
+  source: F1, F2, F3, F5
+  source_columns: As in OP-01 and OP-03
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: KPMG users only. Complexity differs by case, so compare a workstream with itself over time, not across workstreams.
+  decisions: D-22
+  audience: kpmg

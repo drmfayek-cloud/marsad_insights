@@ -1,4 +1,4 @@
-"""The 55 KPIs. Each function takes the context and returns a result dict.
+"""The 64 KPIs (55 in dictionary v0.3, plus OP-01 to OP-09 for KPMG delivery and effort). Each function takes the context and returns a result dict.
 
 Rules applied throughout (see the Decisions sheet of the KPI dictionary):
   D-01 activity is dated by when the work happened (intake date, date logged, report issued, closure date);
@@ -602,9 +602,6 @@ def gs08(c):
         return _gs(c)
     xs = [days(g["start"], g["issued"]) for g in gss_issued(c) if g["start"]]
     m = median(xs)
-    if not xs and any(c.inp(d["response"]) for d in disputes(c)):
-        return nodata(pick("Needs the received date of the disputes answered in this period: enter it on their batch in the tracker.",
-                           "يتطلب تاريخ استلام الاعتراضات التي تم الرد عليها في هذه الفترة: أدخله على الدفعة في السجل."))
     return R(num(m) if m is not None else "-", pick(f"days, median of {len(xs)}", f"يوم، الوسيط من {len(xs)}"), raw=m)
 
 
@@ -843,9 +840,6 @@ def gv03(c):
         return _gv(c)
     xs = [days(x["submitted"], x["approved"]) for x in c.get("F5")["deliverables"] if c.inp(x["approved"]) and x["submitted"]]
     m = median(xs)
-    if not xs and any(c.inp(d["response"]) for d in disputes(c)):
-        return nodata(pick("Needs the received date of the disputes answered in this period: enter it on their batch in the tracker.",
-                           "يتطلب تاريخ استلام الاعتراضات التي تم الرد عليها في هذه الفترة: أدخله على الدفعة في السجل."))
     return R(num(m) if m is not None else "-", pick(f"days, median of {len(xs)}", f"يوم، الوسيط من {len(xs)}"), raw=m)
 
 
@@ -879,6 +873,332 @@ def gv06(c):
     return R(pct(done / len(kt)), f"{done} {t('of')} {len(kt)}", raw=done / len(kt))
 
 
+# ------------------------------------------------------------------ KPMG delivery and effort (OP)
+WS = {  # key -> (English, Arabic, group)
+    "daily": ("MARSAD daily review (approvals and claims)", "المراجعة اليومية - مرصد (الموافقات والمطالبات)", "medical"),
+    "gss": ("GSS claims assurance", "ضمان مطالبات GSS", "medical"),
+    "disputes": ("Hospital disputes", "اعتراضات المستشفيات", "medical"),
+    "financial": ("Financial and accounting review", "المراجعة المالية والمحاسبية", "financial"),
+    "reporting": ("Reporting and governance", "التقارير والحوكمة", "shared"),
+    "requests": ("CNHI ad-hoc requests", "طلبات المركز الإضافية", "shared"),
+    "other": ("Other", "أخرى", "shared"),
+}
+ROLE = {"physician": ("Physicians", "الأطباء"), "finance": ("Finance consultant", "المستشار المالي"),
+        "additional": ("Additional KPMG support", "دعم إضافي من KPMG")}
+
+
+def ws_key(name):
+    n = (name or "").lower()
+    for key, words in (("daily", ("marsad", "daily")), ("gss", ("gss",)), ("disputes", ("dispute",)),
+                       ("financial", ("financ", "account")), ("reporting", ("report", "governance")),
+                       ("requests", ("request", "ad-hoc", "ad hoc"))):
+        if any(w in n for w in words):
+            return key
+    return "other"
+
+
+def role_key(name):
+    n = (name or "").lower()
+    return "physician" if "physician" in n or "doctor" in n else "finance" if "financ" in n else "additional"
+
+
+def ws_label(key):
+    return pick(WS[key][0], WS[key][1])
+
+
+def contract(c):
+    k = dict(months=24, physicians=3, finance=1, hours_per_day=8, start=None)
+    if c.get("F5"):
+        k.update({a: b for a, b in (c.get("F5").get("contract") or {}).items() if b})
+    return k
+
+
+def ctd(c):
+    """The same filters from the contract start (or the earliest data) to the end of the selected period."""
+    cc = Ctx(c.d, "all", c.tpa, c.internal, c.today)
+    cc.start, cc.end = contract(c)["start"] or "0000-00-00", c.end
+    return cc
+
+
+def effort(c):
+    f5 = c.get("F5") or {}
+    return [e for e in f5.get("effort") or [] if c.start[:7] <= e["month"] <= c.end[:7]]
+
+
+def month_working_days(month):
+    y, m = int(month[:4]), int(month[5:7])
+    return sum(1 for d in range(1, calendar.monthrange(y, m)[1] + 1) if dt.date(y, m, d).weekday() not in config.WEEKEND)
+
+
+def period_working_days(c, rows):
+    if c.period != "all":
+        return month_working_days(c.period)
+    return sum(month_working_days(m) for m in {e["month"] for e in rows})
+
+
+NO_EFFORT = ("Add the 'Team effort' sheet to the governance register (person-days per workstream and role each month).",
+             "أضف ورقة 'جهد الفريق' إلى سجل الحوكمة (أيام العمل لكل مسار ودور شهريا).")
+
+
+def _op_effort(c):
+    if not c.get("F5"):
+        return None, nodata(MISSING["F5"])
+    rows = effort(c)
+    if not rows:
+        return None, nodata(pick(*NO_EFFORT))
+    return rows, None
+
+
+def _outputs(c):
+    """Case-level outputs of each workstream in context c (None where the workbook is not uploaded)."""
+    out = {}
+    out["enc"] = sum(x["reviewed"] for x in intake(c)) if c.get("F1") else None
+    if c.get("F2"):
+        iss = [g for g in gss_issued(c) if g["opinion"] != "Review incomplete"]
+        out["gss_reports"], out["gss_claims"] = len(iss), sum(g["sampled"] or 0 for g in iss)
+    else:
+        out["gss_reports"] = out["gss_claims"] = None
+    out["disputes"] = sum(1 for d in disputes(c) if c.inp(d["closed"])) if c.get("F3") else None
+    out["reports"] = sum(1 for x in c.get("F5")["deliverables"] if c.inp(x["submitted"])) if c.get("F5") else None
+    return out
+
+
+def _two(c, fn, fmt=num):
+    """[this period, contract to date] formatted; one column when the whole contract is selected."""
+    a = fn(c)
+    b = fn(ctd(c))
+    f = lambda v: fmt(v) if v is not None else "-"  # noqa: E731
+    return [f(a)] if c.period == "all" else [f(a), f(b)]
+
+
+def _heads(c, first):
+    return [first, pick("Contract to date", "منذ بداية العقد")] if c.period == "all" else \
+        [first, pick("This month", "هذا الشهر"), pick("Contract to date", "منذ بداية العقد")]
+
+
+def op01(c):
+    o, oc = _outputs(c), _outputs(ctd(c))
+    if all(v is None for v in o.values()):
+        return nodata(pick("Upload the workbooks to see the work delivered.", "حمّل الملفات لعرض الأعمال المنجزة."))
+    cases = sum(o[k] or 0 for k in ("enc", "gss_claims", "disputes"))
+    cases_ctd = sum(oc[k] or 0 for k in ("enc", "gss_claims", "disputes"))
+    labels = [("enc", pick("Encounters reviewed (MARSAD daily review)", "حالات تمت مراجعتها (المراجعة اليومية)")),
+              ("gss_claims", pick("Claims sampled in GSS reports issued", "مطالبات تمت مراجعتها في تقارير GSS")),
+              ("gss_reports", pick("GSS assurance reports issued", "تقارير ضمان GSS الصادرة")),
+              ("disputes", pick("Hospital disputes answered", "اعتراضات مستشفيات تم الرد عليها")),
+              ("reports", pick("Deliverables submitted to CNHI", "مخرجات مسلمة للمركز"))]
+    rows = [[lab] + _two(c, lambda x, k=k: _outputs(x)[k]) for k, lab in labels]
+    sub = pick(f"cases reviewed across workstreams · {num(cases_ctd)} contract to date",
+               f"حالة تمت مراجعتها في جميع المسارات · {num(cases_ctd)} منذ بداية العقد")
+    if c.period == "all":
+        sub = pick("cases reviewed across workstreams, contract to date", "حالة تمت مراجعتها في جميع المسارات منذ بداية العقد")
+    return R(num(cases), sub, table=table(_heads(c, pick("Output", "المخرج")), rows), raw=cases)
+
+
+def _value(c):
+    v = {}
+    if c.get("F1"):
+        fl = flags(c)
+        v["found"] = len({f["ref"] or f["log_id"] for f in fl})
+        v["appr"] = sum(once_per_ref([f for f in fl if is_approval(f)]).values())
+        v["claims"] = sum(once_per_ref([f for f in fl if is_claim(f)]).values())
+    v["gss"] = sum(s["at_issue"] for s in sample_rows(c)) if c.get("F2") else None
+    if c.get("F3"):
+        closed = [d for d in disputes(c) if c.inp(d["closed"])]
+        known = any(d["value"] is not None or d["maintained"] is not None for d in closed)
+        v["kept"] = sum(_kept(d) for d in closed) if known else None
+    if c.get("F5"):
+        v["recs"] = sum(1 for r in c.get("F5")["recommendations"]
+                        if r["status"] in ("Accepted", "Implemented") and (c.inp(r["accepted"]) or (not r["accepted"] and c.inp(r["raised"]))))
+    return v
+
+
+def op02(c):
+    v = _value(c)
+    if not v:
+        return nodata(pick("Upload the workbooks to see the findings and value identified.", "حمّل الملفات لعرض الملاحظات والقيم المحددة."))
+    labels = [("found", pick("Encounters with a confirmed finding", "حالات عليها ملاحظة مؤكدة"), num),
+              ("appr", pick("Amount at risk - pre-authorizations (SAR)", "القيمة محل الملاحظة - الموافقات المسبقة"), sar),
+              ("claims", pick("Amount at risk - daily claims review (SAR)", "القيمة محل الملاحظة - المراجعة اليومية للمطالبات"), sar),
+              ("gss", pick("Amount at issue - GSS pre-payment assurance (SAR)", "القيمة محل الملاحظة - ضمان GSS قبل الصرف"), sar),
+              ("kept", pick("Value maintained after hospital disputes (SAR)", "القيمة المحافظ عليها بعد الاعتراضات"), sar),
+              ("recs", pick("Recommendations accepted by CNHI", "توصيات اعتمدها المركز"), num)]
+    rows = [[lab] + _two(c, lambda x, k=k: _value(x).get(k), fmt) for k, lab, fmt in labels]
+    head = v.get("found")
+    return R(num(head) if head is not None else "-",
+             pick("encounters with a confirmed finding · values identified, not recovered cash",
+                  "حالة عليها ملاحظة مؤكدة · قيم محددة وليست مبالغ مستردة"),
+             table=table(_heads(c, pick("Finding or value", "الملاحظة أو القيمة")), rows), raw=head)
+
+
+def op03(c):
+    rows, miss = _op_effort(c)
+    if miss:
+        return miss
+    by = defaultdict(float)
+    for e in rows:
+        by[ws_key(e["workstream"])] += e["days"]
+    allc = defaultdict(float)
+    for e in effort(ctd(c)):
+        allc[ws_key(e["workstream"])] += e["days"]
+    total, wd = sum(by.values()), period_working_days(c, rows)
+    order = [k for k in WS if k in by or k in allc]
+    tab = [[ws_label(k), num(by.get(k, 0))] + ([] if c.period == "all" else [num(allc.get(k, 0))]) for k in order]
+    hd = [pick("Workstream", "المسار"), pick("Person-days", "أيام العمل")] + ([] if c.period == "all" else [pick("Contract to date", "منذ بداية العقد")])
+    fte = num(round(total / wd, 1)) if wd else "-"
+    sub = pick(f"person-days · about {fte} full-time equivalent", f"يوم عمل · ما يعادل {fte} موظف بدوام كامل") if c.internal \
+        else pick("person-days across all workstreams", "يوم عمل في جميع المسارات")     # FTE against plan stays KPMG-only (OP-08)
+    return R(num(total), sub,
+             chart=charts.hbar([(ws_label(k), by[k]) for k in order if by.get(k)], rtl=lang() == "ar"),
+             table=table(hd, tab), raw=total)
+
+
+def op04(c):
+    rows, miss = _op_effort(c)
+    if miss:
+        return miss
+    g = defaultdict(float)
+    for e in rows:
+        g[WS[ws_key(e["workstream"])][2]] += e["days"]
+    med, fin = g["medical"], g["financial"]
+    if not med + fin:
+        return nodata(pick("No person-days recorded on medical or financial review in this period.",
+                           "لم تسجل أيام عمل على المراجعة الطبية أو المالية في هذه الفترة."))
+    k = contract(c)
+    plan = k["physicians"] / (k["physicians"] + k["finance"]) if k["physicians"] + k["finance"] else None
+    share = med / (med + fin)
+    tab = [[pick("Medical and operational review", "المراجعة الطبية والتشغيلية"), num(med), pct(share), "80%", pct(plan)],
+           [pick("Financial and accounting review", "المراجعة المالية والمحاسبية"), num(fin), pct(1 - share), "20%",
+            pct(1 - plan if plan is not None else None)]]
+    return R(pct(share), pick(f"medical · {pct(1 - share)} financial · operating model 80/20",
+                              f"طبي · {pct(1 - share)} مالي · النموذج التشغيلي 80/20"),
+             table=table([pick("Workstream", "المسار"), pick("Person-days", "أيام العمل"), pick("Actual", "الفعلي"),
+                          pick("Operating model", "النموذج التشغيلي"), pick("Contracted team", "الفريق المتعاقد عليه")], tab),
+             raw=share)
+
+
+def op05(c):
+    rows, miss = _op_effort(c)
+    if miss:
+        return miss
+    parts = defaultdict(float)
+    for e in rows:
+        w, r = ws_key(e["workstream"]), role_key(e["role"])
+        if r == "additional":
+            parts["support"] += e["days"]
+        elif w in ("disputes", "requests"):
+            parts[w] += e["days"]
+    total = sum(e["days"] for e in rows)
+    add = sum(parts.values())
+    tab = [[pick("Hospital disputes (contracted team)", "اعتراضات المستشفيات (الفريق المتعاقد عليه)"), num(parts["disputes"])],
+           [pick("CNHI ad-hoc requests (contracted team)", "طلبات المركز الإضافية (الفريق المتعاقد عليه)"), num(parts["requests"])],
+           [pick("Additional KPMG support, outside the contracted team", "دعم إضافي من KPMG خارج الفريق المتعاقد عليه"), num(parts["support"])]]
+    if c.get("F3"):
+        hrs = sum(x["hours"] for x in c.get("F3")["time"] if c.inp(x["date"]))
+        if hrs:
+            tab.append([pick("For reference: dispute hours logged in the disputes tracker", "للمرجعية: ساعات الاعتراضات المسجلة في سجل الاعتراضات"),
+                        f"{num(hrs)} {t('hours')} ≈ {num(hrs / contract(c)['hours_per_day'])}"])
+    return R(num(add), pick(f"person-days beyond the routine review scope · {pct(add / total if total else 0)} of total effort",
+                            f"يوم عمل خارج نطاق المراجعة الاعتيادية · {pct(add / total if total else 0)} من إجمالي الجهد"),
+             table=table([pick("Additional work", "العمل الإضافي"), pick("Person-days", "أيام العمل")], tab), raw=add)
+
+
+def op06(c):
+    if not c.get("F5"):
+        return nodata(MISSING["F5"])
+    rq = [x for x in c.get("F5").get("requests") or [] if (x["status"] or "").lower() != "cancelled"]
+    if not c.get("F5").get("requests"):
+        return nodata(pick("Add the 'CNHI requests' sheet to the governance register.", "أضف ورقة 'طلبات المركز' إلى سجل الحوكمة."))
+    rec = [x for x in rq if c.inp(x["received"])]
+    dlv = [x for x in rq if c.inp(x["delivered"])]
+    open_ = [x for x in rq if c.upto(x["received"]) and not (x["delivered"] and x["delivered"] <= c.end)]
+    tat = median([working_days(x["received"], x["delivered"]) for x in dlv if x["received"]])
+    hrs = sum(x["hours"] or 0 for x in dlv)
+    sub = pick(f"received · {len(dlv)} delivered · {len(open_)} open", f"وارد · {len(dlv)} مسلم · {len(open_)} مفتوح")
+    if tat is not None:
+        sub += pick(f" · median {num(tat)} working days", f" · الوسيط {num(tat)} أيام عمل")
+    by = Counter(x["type"] or "-" for x in rec)
+    tab = table([pick("Measure", "المقياس"), pick("Value", "القيمة")],
+                [[pick("Delivered on or before the due date", "مسلمة في الموعد أو قبله"),
+                  f"{sum(1 for x in dlv if x['due'] and x['delivered'] <= x['due'])} {t('of')} {sum(1 for x in dlv if x['due'])}"],
+                 [pick("Hours on requests delivered", "ساعات الطلبات المسلمة"), num(hrs)]])
+    return R(num(len(rec)), sub, chart=charts.hbar(by.most_common(), rtl=lang() == "ar") if rec else None, table=tab, raw=len(rec))
+
+
+def op07(c):
+    k = contract(c)
+    if not c.get("F5"):
+        return nodata(MISSING["F5"])
+    if not k["start"]:
+        return nodata(pick("Enter the contract start date in the 'Contract' sheet of the governance register.",
+                           "أدخل تاريخ بداية العقد في ورقة 'العقد' في سجل الحوكمة."))
+    s0, e0 = dt.date.fromisoformat(k["start"]), dt.date.fromisoformat(min(c.end, c.today))
+    dur = int(k["months"])
+    n = max(0, min(dur, (e0.year - s0.year) * 12 + e0.month - s0.month + 1))
+    done = Counter(x["type"] for x in c.get("F5")["deliverables"] if x["submitted"] and x["submitted"] <= c.end)
+    plan = [("Monthly review report", pick("Monthly review reports", "تقارير المراجعة الشهرية"), dur),
+            ("Quarterly financial report", pick("Quarterly financial reports", "التقارير المالية الربعية"), dur // 3),
+            ("Annual consolidated report", pick("Annual consolidated reports", "التقارير السنوية الموحدة"), dur // 12)]
+    rows = [[lab, num(done.get(key, 0)), num(total)] for key, lab, total in plan]
+    if done.get("GSS assurance report"):
+        rows.append([pick("GSS assurance reports", "تقارير ضمان GSS"), num(done["GSS assurance report"]), "-"])
+    kt = c.get("F5")["kt"]
+    if kt:
+        rows.append([pick("Knowledge-transfer items delivered", "بنود نقل المعرفة المنجزة"),
+                     num(sum(1 for x in kt if x["delivered"] and x["delivered"] <= c.end)), num(len(kt))])
+    return R(pick(f"Month {n} of {dur}", f"الشهر {n} من {dur}"),
+             pick(f"contract started {k['start']} · {pct(n / dur)} of the term elapsed",
+                  f"بدأ العقد في {k['start']} · انقضى {pct(n / dur)} من المدة"),
+             table=table([pick("Deliverable", "المخرج"), pick("Submitted to date", "المسلم حتى تاريخه"), pick("Contract total", "إجمالي العقد")], rows),
+             raw=n / dur)
+
+
+def op08(c):
+    rows, miss = _op_effort(c)
+    if miss:
+        return miss
+    k, wd = contract(c), period_working_days(c, rows)
+    by = defaultdict(float)
+    for e in rows:
+        by[role_key(e["role"])] += e["days"]
+    fte = {r: (by[r] / wd if wd else 0) for r in ROLE}
+    plan = {"physician": k["physicians"], "finance": k["finance"], "additional": None}
+    deployed, contracted = fte["physician"] + fte["finance"], k["physicians"] + k["finance"]
+    tab = [[pick(*ROLE[r]), num(by[r]), num(round(fte[r], 1)), num(plan[r]) if plan[r] is not None else "-"] for r in ROLE]
+    return R(pick(f"{num(round(deployed, 1))} of {num(contracted)} FTE", f"{num(round(deployed, 1))} من {num(contracted)}"),
+             pick(f"contracted team deployed · {num(wd)} working days in the period",
+                  f"الفريق المتعاقد عليه · {num(wd)} يوم عمل في الفترة"),
+             table=table([pick("Role", "الدور"), pick("Person-days", "أيام العمل"), pick("FTE equivalent", "ما يعادل دواما كاملا"),
+                          pick("Contracted", "المتعاقد عليه")], tab), raw=deployed / contracted if contracted else None)
+
+
+def op09(c):
+    rows, miss = _op_effort(c)
+    if miss:
+        return miss
+    by = defaultdict(float)
+    for e in rows:
+        if role_key(e["role"]) != "additional":
+            by[ws_key(e["workstream"])] += e["days"]
+    o = _outputs(c)
+    lines = [("daily", "enc", pick("Encounters reviewed per person-day", "حالات لكل يوم عمل")),
+             ("gss", "gss_claims", pick("GSS claims sampled per person-day", "مطالبات GSS لكل يوم عمل")),
+             ("disputes", "disputes", pick("Disputes answered per person-day", "اعتراضات لكل يوم عمل"))]
+    tab, head = [], None
+    for w, k, lab in lines:
+        if by.get(w) and o.get(k) is not None:
+            v = o[k] / by[w]
+            head = v if head is None and w == "daily" else head
+            tab.append([lab, num(o[k]), num(by[w]), num(round(v, 1))])
+    if not tab:
+        return nodata(pick("Needs person-days on the review workstreams and the matching workbook.",
+                           "يتطلب أيام عمل على مسارات المراجعة والملف المقابل."))
+    return R(num(round(head, 1)) if head is not None else "-", pick("encounters reviewed per physician-day (MARSAD daily review)",
+                                                                   "حالة لكل يوم عمل طبيب (المراجعة اليومية)"),
+             table=table([pick("Workstream output", "مخرج المسار"), pick("Output", "المخرج"), pick("Person-days", "أيام العمل"),
+                          pick("Per person-day", "لكل يوم عمل")], tab), raw=head)
+
+
 FUNCS = {
     "EX-01": ex01, "EX-02": ex02, "EX-03": ex03, "EX-04": ex04, "EX-05": ex05, "EX-06": ex06, "EX-07": ex07,
     "EX-08": ex08, "EX-09": ex09, "EX-10": ex10,
@@ -888,6 +1208,8 @@ FUNCS = {
     "FR-01": fr01, "FR-02": fr02, "FR-03": fr03, "FR-04": fr04, "FR-05": fr05, "FR-06": fr06, "FR-07": fr07, "FR-08": fr08,
     "FW-01": fw01, "FW-02": fw02, "FW-03": fw03, "FW-04": fw04, "FW-05": fw05, "FW-06": fw06, "FW-07": fw07, "FW-08": fw08,
     "GV-01": gv01, "GV-02": gv02, "GV-03": gv03, "GV-04": gv04, "GV-05": gv05, "GV-06": gv06,
+    "OP-01": op01, "OP-02": op02, "OP-03": op03, "OP-04": op04, "OP-05": op05, "OP-06": op06, "OP-07": op07,
+    "OP-08": op08, "OP-09": op09,
 }
 NEEDS = {"EX-01": "F1", "EX-02": "F1", "EX-03": "F1", "EX-04": "F1", "EX-06": "F1", "DR": "F1", "FW": "F1"}
 
@@ -919,6 +1241,7 @@ def months(data):
         ms |= {(d["received"] or d["closed"])[:7] for d in data["F3"]["disputes"] if d["received"] or d["closed"]}
     if data.get("F5"):
         ms |= {x["due"][:7] for x in data["F5"]["deliverables"] if x["due"]}
+        ms |= {e["month"] for e in data["F5"].get("effort") or []}
     cur = dt.date.today().isoformat()[:7]
     return sorted(m for m in ms if m and m[:4].isdigit() and m <= cur)
 

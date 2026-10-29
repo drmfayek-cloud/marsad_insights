@@ -174,6 +174,14 @@ class AppTests(unittest.TestCase):
         wb = load_workbook(io.BytesIO(r.data))
         ws = wb["Deliverables"]
         ws["A6"], ws["B6"], ws["C6"], ws["E6"] = "Monthly review report", "Aug-2026", dt.date(2026, 9, 10), dt.date(2026, 9, 9)
+        te = wb["Team effort"]
+        for i, (w, role, days) in enumerate([("MARSAD daily review (approvals and claims)", "Physician", 44),
+                                             ("Hospital disputes", "Physician", 22), ("Financial and accounting review", "Finance consultant", 22),
+                                             ("Reporting and governance", "Additional KPMG support", 5)], start=6):
+            te[f"A{i}"], te[f"B{i}"], te[f"C{i}"], te[f"D{i}"] = w, role, "Sep-2026", days
+        rq = wb["CNHI requests"]
+        rq["A6"], rq["B6"], rq["C6"], rq["D6"], rq["F6"], rq["G6"] = "Q1", dt.date(2026, 9, 1), "CNHI Finance", "Case review", dt.date(2026, 9, 3), 5
+        wb["Contract"]["B5"] = dt.date(2025, 10, 1)
         bio = io.BytesIO()
         wb.save(bio)
         r = self.upload("F5", bio.getvalue(), "gov.xlsx")
@@ -183,6 +191,21 @@ class AppTests(unittest.TestCase):
             g.lang = "en"
             c = kpi.Ctx(store.current(), "2026-09", "")
             self.assertEqual(kpi.compute("EX-10", c)["raw"], 1.0)
+            self.assertEqual(kpi.compute("OP-03", c)["raw"], 93)                 # example row ignored, month typed as text
+            self.assertAlmostEqual(kpi.compute("OP-04", c)["raw"], 66 / 88)      # reporting left out of the mix
+            self.assertEqual(kpi.compute("OP-05", c)["raw"], 27)                 # disputes 22 + additional support 5
+            self.assertEqual(kpi.compute("OP-06", c)["raw"], 1)
+            self.assertEqual(kpi.compute("OP-07", c)["value"], "Month 12 of 24")
+            self.assertAlmostEqual(kpi.compute("OP-08", c)["raw"], (66 + 22) / 22 / 4)   # 22 working days in Sep 2026 (Sun-Thu)
+        # a CNHI viewer sees the page without the KPMG-only tiles
+        db.insert("users", email="viewer@test.local", name="CNHI viewer", role="cnhi", pw_hash=auth.hash_pw(NEW_PW), must_change_pw=0)
+        c2 = A.app.test_client()
+        r = c2.get("/login")
+        c2.post("/login", data=dict(csrf=tok(r.text), email="viewer@test.local", password=NEW_PW))
+        page = c2.get("/p/delivery?period=2026-09").text
+        self.assertIn("OP-05", page)
+        self.assertNotIn("OP-08", page)
+        self.assertIn("OP-08", self.c.get("/p/delivery?period=2026-09").text)
 
     def test_07_every_page_both_languages(self):
         for lg in ("en", "ar"):
@@ -217,6 +240,33 @@ class AppTests(unittest.TestCase):
         other.post("/account", data=dict(csrf=tok(r.text), current=temp.group(1), new="Cfo!Pass2026xyz", repeat="Cfo!Pass2026xyz"))
         self.assertEqual(other.get("/data").status_code, 403)
         self.assertEqual(other.get("/p/executive").status_code, 200)
+
+    def test_11_mfa_setup_with_qr_code(self):
+        db.insert("users", email="mfa@test.local", name="MFA user", role="kpmg", pw_hash=auth.hash_pw(NEW_PW), must_change_pw=0)
+        A.app.config["REQUIRE_MFA"] = True
+        try:
+            c = A.app.test_client()
+            c.get("/lang/ar")
+            r = c.get("/login")
+            r = c.post("/login", data=dict(csrf=tok(r.text), email="mfa@test.local", password=NEW_PW))
+            self.assertIn("/mfa/setup", r.headers["Location"])
+            page = c.get("/mfa/setup").text
+            uri = re.search(r'href="(otpauth://totp/[^"]+)"', page).group(1).replace("&amp;", "&")
+            self.assertIn("issuer=MARSAD%20Insights", uri)
+            try:
+                import segno  # noqa: F401
+                self.assertIn('class="qr"', page)                                   # QR code drawn on the page
+                self.assertIn('viewBox="', page)
+            except ImportError:
+                self.assertIn('class="secret"', page)                              # falls back to the typed key
+            secret = re.search(r"secret=([A-Z2-7]+)", uri).group(1)
+            r = c.post("/mfa/setup", data=dict(csrf=tok(page), code=auth.totp(secret)))
+            self.assertEqual(r.status_code, 302)
+            self.assertIn("/p/executive", r.headers["Location"])
+            self.assertIn('lang="ar"', c.get("/p/executive").text)                    # language chosen before sign-in kept
+            self.assertEqual(db.q1("SELECT mfa_enabled FROM users WHERE email='mfa@test.local'")["mfa_enabled"], 1)
+        finally:
+            A.app.config["REQUIRE_MFA"] = False
 
     def test_10_lockout_after_failed_logins(self):
         other = A.app.test_client()
