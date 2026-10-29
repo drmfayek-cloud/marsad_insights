@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ pick('Documents', 'المستندات') }}{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <h1>{{ pick('Documents', 'المستندات') }}</h1>
+    <div class="sub">{{ pick('Reports, CNHI minutes, evidence and dispute files, linked to actions, decisions, deliverables and dispute batches.',
+                             'التقارير ومحاضر المركز والأدلة وملفات الاعتراضات، مرتبطة بالإجراءات والقرارات والمخرجات ودفعات الاعتراضات.') }}
+      {% if not can_upload %}{{ pick('You see the documents shared with CNHI.', 'تظهر لك المستندات المشاركة مع المركز.') }}{% endif %}</div>
+  </div>
+  {% if can_upload %}<a class="btn primary" href="{{ url_for('document_upload') }}">{{ pick('Upload a document', 'تحميل مستند') }}</a>{% endif %}
+</div>
+{% if config.DEMO %}<div class="flash error">{{ pick('Demo system: do not upload real CNHI documents. Files here are deleted when the preview restarts.',
+  'نظام تجريبي: لا تحمّل مستندات حقيقية للمركز. تحذف الملفات عند إعادة تشغيل النسخة التجريبية.') }}</div>{% endif %}
+<form class="filters docfilters" method="get">
+  <label>{{ pick('Search', 'بحث') }}<input name="q" value="{{ args.get('q', '') }}" placeholder="{{ pick('Title, file name or text', 'العنوان أو اسم الملف أو النص') }}"></label>
+  <label>{{ pick('Category', 'الفئة') }}<select name="category" data-auto><option value="">{{ pick('All', 'الكل') }}</option>
+    {% for k, v in CATS.items() %}<option value="{{ k }}" {{ 'selected' if args.get('category') == k }}>{{ pick(v[0], v[1]) }}</option>{% endfor %}</select></label>
+  <label>{{ pick('Linked to', 'مرتبط بـ') }}<select name="kind" data-auto><option value="">{{ pick('Anything', 'أي عنصر') }}</option>
+    {% for k, v in KINDS.items() %}<option value="{{ k }}" {{ 'selected' if args.get('kind') == k }}>{{ pick(v[0], v[1]) }}</option>{% endfor %}</select></label>
+  {% if args.get('ref') %}<input type="hidden" name="ref" value="{{ args.get('ref') }}">{% endif %}
+  <button class="btn">{{ pick('Search', 'بحث') }}</button>
+  {% if args %}<a class="btn" href="{{ url_for('documents') }}">{{ pick('Clear', 'مسح') }}</a>{% endif %}
+</form>
+{% if args.get('ref') %}<p class="small">{{ pick('Showing documents linked to', 'المستندات المرتبطة بـ') }} <b dir="ltr">{{ args.get('ref') }}</b></p>{% endif %}
+<div class="card wide">
+  {% if docs %}
+  <div class="tablewrap"><table class="t">
+    <thead><tr><th>{{ pick('Document', 'المستند') }}</th><th>{{ pick('Category', 'الفئة') }}</th><th>{{ pick('Period', 'الفترة') }}</th>
+      <th>{{ pick('Linked to', 'مرتبط بـ') }}</th>{% if can_upload %}<th>{{ pick('Visible to', 'متاح لـ') }}</th>{% endif %}
+      <th>{{ pick('Uploaded', 'تاريخ التحميل') }}</th><th></th></tr></thead>
+    <tbody>{% for d in docs %}
+      <tr><td><a href="{{ url_for('document_view', doc_id=d.id) }}">{{ d.title }}</a>
+            <div class="small muted" dir="ltr">{{ d.filename }} · {{ (d.size / 1024)|round|int }} KB</div></td>
+          <td>{{ pick(CATS[d.category][0], CATS[d.category][1]) }}</td>
+          <td dir="ltr">{{ d.period or '-' }}</td>
+          <td>{% for k, ref in links[d.id] %}<a class="linkchip" href="{{ url_for('documents', kind=k, ref=ref) }}" dir="ltr">{{ ref }}</a>{% else %}-{% endfor %}</td>
+          {% if can_upload %}<td>{% if d.visibility == 'shared' %}<span class="stat t-green">{{ pick('KPMG and CNHI', 'KPMG والمركز') }}</span>
+            {% else %}<span class="stat t-slate">{{ pick('KPMG only', 'KPMG فقط') }}</span>{% endif %}</td>{% endif %}
+          <td dir="ltr">{{ d.uploaded_at[:10] }}</td>
+          <td><a class="btn small" href="{{ url_for('document_download', doc_id=d.id) }}">{{ pick('Download', 'تنزيل') }}</a></td></tr>
+    {% endfor %}</tbody></table></div>
+  {% else %}<p class="muted">{{ pick('No document matches.', 'لا توجد مستندات مطابقة.') }}</p>{% endif %}
+</div>
+{% endblock %}

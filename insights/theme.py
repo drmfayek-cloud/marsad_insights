@@ -26,6 +26,9 @@ KPI_STYLE = {
     "OP-01": ("teal", "check"), "OP-02": ("amber", "coin"), "OP-03": ("indigo", "layers"), "OP-04": ("blue", "scale"),
     "OP-05": ("violet", "people"), "OP-06": ("green", "send"), "OP-07": ("pink", "calendar"), "OP-08": ("coral", "gauge"),
     "OP-09": ("teal", "pulse"),
+    "EX-11": ("coral", "repeat"),
+    "GC-01": ("indigo", "doc"), "GC-02": ("blue", "clock"), "GC-03": ("violet", "scale"), "GC-04": ("amber", "flag"),
+    "GC-05": ("green", "calendar"), "GC-06": ("coral", "building"), "GC-07": ("teal", "wallet"), "GC-08": ("pink", "target"),
 }
 
 # Category labels that carry meaning get a fixed colour wherever they appear (charts, legends).
@@ -36,6 +39,11 @@ SEMANTIC = {
     "No issue identified": "green", "Documentation gap": "amber", "Clinical concern": "coral",
     "Financial discrepancy": "violet", "Insufficient information": "blue",
     "Error": "blue", "Waste": "amber", "Abuse": "coral", "Suspected fraud": "pink",
+    "Approved": "green", "Approved with changes": "teal", "Rejected": "coral", "Deferred": "amber", "Pending": "blue",
+    "Proposed": "blue", "Under CNHI review": "amber", "Issued": "green", "Withdrawn": "violet",
+    "اعتماد": "green", "اعتماد مع تعديلات": "teal", "رفض": "coral", "تأجيل": "amber",
+    "معتمدة": "green", "معتمد مع تعديلات": "teal", "مرفوضة": "coral", "مؤجل": "amber", "معلق": "blue",
+    "مقترحة": "blue", "قيد مراجعة المركز": "amber", "صادرة": "green", "مسحوبة": "violet",
     "Medical and operational review": "teal", "Financial and accounting review": "indigo",
     "Endorse - route to TPA": "green", "Endorse – route to TPA": "green", "Not endorsed": "coral",
 }

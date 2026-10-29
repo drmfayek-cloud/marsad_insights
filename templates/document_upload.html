@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ pick('Upload a document', 'تحميل مستند') }}{% endblock %}
+{% block content %}
+<p class="small"><a href="{{ url_for('documents') }}">← {{ pick('Documents', 'المستندات') }}</a></p>
+<h1>{% if parent %}{{ pick('New version of', 'نسخة جديدة من') }} “{{ parent.title }}”{% else %}{{ pick('Upload a document', 'تحميل مستند') }}{% endif %}</h1>
+{% if config.DEMO %}<div class="flash error">{{ pick('Demo system: do not upload real CNHI documents.', 'نظام تجريبي: لا تحمّل مستندات حقيقية للمركز.') }}</div>{% endif %}
+<div class="card wide docform">
+  <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    {% if parent %}<input type="hidden" name="parent" value="{{ parent.id }}">{% endif %}
+    <label>{{ pick('File: PDF, Word (.docx) or Excel (.xlsx, .xlsm), up to 25 MB', 'الملف: PDF أو Word (.docx) أو Excel (.xlsx, .xlsm) حتى 25 ميغابايت') }}
+      <input type="file" name="file" accept=".pdf,.docx,.xlsx,.xlsm" required></label>
+    {% set v = form if form else pre %}
+    {% if form %}{% set v = dict(title=form.title, category=form.category, period=form.period, description=form.description,
+       visibility=form.visibility, links=[]) %}{% endif %}
+    {% include "_doc_fields.html" %}
+    <label class="inline confirm"><input type="checkbox" name="confirm" value="1"><span>
+      {{ pick('I confirm this file holds no patient identifiers (names, national ID or iqama numbers). Tick only if the upload is refused for a false match or a scanned file; it is recorded in the audit log.',
+              'أؤكد أن الملف لا يحتوي على بيانات تعريف المرضى (الأسماء أو أرقام الهوية أو الإقامة). اختر ذلك فقط إذا رُفض التحميل لتطابق خاطئ أو لملف ممسوح ضوئيا؛ يسجل ذلك في سجل التدقيق.') }}</span></label>
+    <button class="btn primary">{{ pick('Upload', 'تحميل') }}</button>
+  </form>
+  <p class="small muted">{{ pick('Every upload is checked: the file must really be a PDF, Word or Excel file, and its text is scanned for patient identifiers (10-digit ID numbers, patient-name labels). Older .doc and .xls files cannot be checked: save them as .docx or .xlsx.',
+     'يفحص كل ملف: يجب أن يكون فعلا PDF أو Word أو Excel، ويفحص نصه بحثا عن بيانات تعريف المرضى. لا يمكن فحص ملفات .doc و.xls القديمة: احفظها بصيغة .docx أو .xlsx.') }}</p>
+</div>
+{% endblock %}

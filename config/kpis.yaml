@@ -1,6 +1,6 @@
-# KPI dictionary v0.4 (29 October 2026; v0.3 plus OP-01 to OP-09) - generated from CNHI_Dashboard_KPI_Dictionary_v0.3.xlsx.
-# Edit wording here; the dashboard reads names, definitions and caveats from this file. Calculations live in insights/kpi.py.
-version: '0.4'
+# KPI dictionary v0.6 (29 October 2026): v0.5 plus GC-09 corrective-action status (D-24); status rules in insights/actions.py.
+# GV-01 to GV-06 sit on the KPMG delivery & effort page. Calculations live in insights/kpi.py.
+version: '0.6'
 pages:
 - code: EX
   slug: executive
@@ -11,10 +11,18 @@ pages:
   en: KPMG delivery & effort
   ar: إنجازات وجهد فريق KPMG
   sections:
-  - {key: delivered, en: Work delivered and value identified, ar: الأعمال المنجزة والقيم المحددة}
-  - {key: effort, en: Effort and additional work, ar: الجهد والعمل الإضافي}
-  - {key: responsive, en: Responsiveness and contract progress, ar: الاستجابة وتقدم العقد}
-  - {key: internal, en: KPMG only - capacity and output, ar: لفريق KPMG فقط - الطاقة والإنتاجية}
+  - key: delivered
+    en: Work delivered and value identified
+    ar: الأعمال المنجزة والقيم المحددة
+  - key: effort
+    en: Effort, additional work and CNHI requests
+    ar: الجهد والعمل الإضافي وطلبات المركز
+  - key: contract
+    en: Contract delivery and project governance
+    ar: تسليم مخرجات العقد وحوكمة المشروع
+  - key: internal
+    en: KPMG only - capacity and output
+    ar: لفريق KPMG فقط - الطاقة والإنتاجية
 - code: DR
   slug: daily-review
   en: MARSAD daily review
@@ -35,10 +43,26 @@ pages:
   slug: fwa
   en: FWA, trends & root causes
   ar: الاحتيال والهدر والأسباب الجذرية
-- code: GV
+- code: GC
   slug: governance
-  en: Governance & deliverables
-  ar: الحوكمة والمخرجات
+  en: Governance & corrective actions
+  ar: الحوكمة والإجراءات التصحيحية
+  sections:
+  - key: status
+    en: Corrective-action status
+    ar: حالة الإجراءات التصحيحية
+  - key: policy
+    en: Policy and manual changes
+    ar: تحديث السياسات والأدلة
+  - key: decisions
+    en: CNHI decisions
+    ar: قرارات المركز
+  - key: actions
+    en: Corrective actions on TPAs and providers
+    ar: الإجراءات التصحيحية على الشركات ومقدمي الخدمة
+  - key: effect
+    en: Recovery and effect
+    ar: الاسترداد والأثر
 kpis:
 - id: EX-01
   page: EX
@@ -46,8 +70,7 @@ kpis:
   placement: CFO page - headline tile
   name_en: Encounters reviewed
   name_ar: الحالات المراجعة
-  def_en: Number of pre-authorization encounters the team reviewed in the period, as recorded in the daily intake (claims added once in daily
-    scope).
+  def_en: Number of pre-authorization encounters the team reviewed in the period, as recorded in the daily intake (claims added once in daily scope).
   def_ar: عدد حالات الموافقة المسبقة التي راجعها الفريق خلال الفترة وفق سجل الاستلام اليومي، وتضاف المطالبات عند دخولها نطاق المراجعة اليومية.
   formula: 'SUM(Daily Intake: Reviewed)'
   unit: Count
@@ -79,8 +102,7 @@ kpis:
   refresh: Daily
   owner: KPMG medical review lead
   target: 100%
-  caveat: 'Replaces capacity utilisation on the CFO page (D-18): the register counts screened encounters (568 a day in September), so a 100-a-day
-    capacity would read as 500%+ utilisation.'
+  caveat: 'Replaces capacity utilisation on the CFO page (D-18): the register counts screened encounters (568 a day in September), so a 100-a-day capacity would read as 500%+ utilisation.'
   decisions: D-10, D-18
 - id: EX-03
   page: EX
@@ -100,8 +122,7 @@ kpis:
   refresh: Daily
   owner: KPMG medical review lead
   target: '-'
-  caveat: A reference with several flags counts once. Encounters are screened against risk rules, so this is not an error rate for all approvals.
-    October 2026 to date reads 0.8% against 6.6% in September, which points to flags not yet logged; check before publishing.
+  caveat: A reference with several flags counts once. Encounters are screened against risk rules, so this is not an error rate for all approvals. October 2026 to date reads 0.8% against 6.6% in September, which points to flags not yet logged; check before publishing.
   decisions: D-02, D-08
 - id: EX-04
   page: EX
@@ -121,9 +142,7 @@ kpis:
   refresh: Daily
   owner: KPMG medical review lead
   target: '-'
-  caveat: 'Amount at risk is the estimated or approved value of the flagged encounter, not a computed disallowance. Counted once per reference
-    (D-19): summing every flag overstates the value by about 10% (SAR 105.5M vs 95.6M, Sep-Oct 2026). Potential cost avoidance at the Identified
-    stage.'
+  caveat: 'Amount at risk is the estimated or approved value of the flagged encounter, not a computed disallowance. Counted once per reference (D-19): summing every flag overstates the value by about 10% (SAR 105.5M vs 95.6M, Sep-Oct 2026). Potential cost avoidance at the Identified stage.'
   decisions: D-03, D-04, D-05, D-19
 - id: EX-05
   page: EX
@@ -163,8 +182,7 @@ kpis:
   refresh: Daily
   owner: KPMG medical review lead
   target: '-'
-  caveat: Action level identifies TPA-level flags today; the date each flag is shared with the TPA (through the Share sheets) needs its own column.
-    Responses and recoveries are not captured yet.
+  caveat: Action level identifies TPA-level flags today; the date each flag is shared with the TPA (through the Share sheets) needs its own column. Responses and recoveries are not captured yet.
   decisions: D-03, D-09
 - id: EX-07
   page: EX
@@ -238,7 +256,7 @@ kpis:
   unit: '%'
   date_basis: Due date
   counting_unit: Deliverable
-  source: F5 Governance register (new)
+  source: F5 Project delivery register (new)
   source_columns: ''
   status: Needs new source
   refresh: Monthly
@@ -246,6 +264,26 @@ kpis:
   target: 100%
   caveat: Counts submission, not CNHI approval (see GV-02).
   decisions: D-10
+- id: EX-11
+  page: EX
+  tier: 1
+  placement: CFO page - secondary row
+  name_en: Corrective actions open
+  name_ar: الإجراءات التصحيحية المفتوحة
+  def_en: Corrective actions on TPAs and providers still open at period end, with how many are past their due date.
+  def_ar: الإجراءات التصحيحية على شركات إدارة المطالبات ومقدمي الخدمة المفتوحة بنهاية الفترة، وعدد المتأخر منها عن موعده.
+  formula: COUNT(actions with status On track, Due soon or Overdue as at period end); overdue and due soon from the same status rules
+  unit: Count
+  date_basis: Opened, due and completed dates
+  counting_unit: Action
+  source: F6 Governance & corrective-action register
+  source_columns: 'Corrective actions: Opened date, Due date, Completed date, Status'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Status is calculated from the dates (D-24). Cancelled actions are left out. A warning shows when the register is more than 7 days old.
+  decisions: D-23, D-24
 - id: DR-01
   page: DR
   tier: 2
@@ -312,10 +350,8 @@ kpis:
   placement: Page
   name_en: Findings by flag family
   name_ar: الملاحظات حسب عائلة الملاحظة
-  def_en: Number and SAR amount at risk of confirmed flags by flag family (eligibility, emergency qualification, triage, benefit and duration,
-    documentation, provider and channel, data quality, claims, turnaround).
-  def_ar: عدد الملاحظات المؤكدة وقيمتها المعرضة للمخاطر بالريال حسب عائلة الملاحظة، مثل الأهلية واستحقاق الطوارئ وسلامة الفرز والمنفعة والمدة
-    والتوثيق ومقدم الخدمة وقناة التقديم وجودة البيانات والمطالبات وزمن الإنجاز.
+  def_en: Number and SAR amount at risk of confirmed flags by flag family (eligibility, emergency qualification, triage, benefit and duration, documentation, provider and channel, data quality, claims, turnaround).
+  def_ar: عدد الملاحظات المؤكدة وقيمتها المعرضة للمخاطر بالريال حسب عائلة الملاحظة، مثل الأهلية واستحقاق الطوارئ وسلامة الفرز والمنفعة والمدة والتوثيق ومقدم الخدمة وقناة التقديم وجودة البيانات والمطالبات وزمن الإنجاز.
   formula: COUNT and SUM(amount at risk) of confirmed flags grouped by flag family (prefix of Flag code)
   unit: Count / SAR
   date_basis: Date logged
@@ -566,8 +602,7 @@ kpis:
   refresh: Per GSS
   owner: KPMG GSS assurance lead
   target: '-'
-  caveat: 'Opinion rules come from the workbook: Satisfactory at most 5% of sampled claims flagged; Unsatisfactory above 20% or any critical checkpoint
-    failed. ''Review incomplete'' is excluded.'
+  caveat: 'Opinion rules come from the workbook: Satisfactory at most 5% of sampled claims flagged; Unsatisfactory above 20% or any critical checkpoint failed. ''Review incomplete'' is excluded.'
   decisions: D-08
 - id: GS-02
   page: GS
@@ -576,8 +611,7 @@ kpis:
   name_en: GSS awaiting review
   name_ar: ملفات GSS بانتظار المراجعة
   def_en: GSS in the CNHI clearance queue not yet reported on, by stage (not registered, sampling, under review), with their claimed value.
-  def_ar: ملفات GSS في قائمة التصفية لدى المركز التي لم يصدر الفريق تقريرها بعد، حسب المرحلة (غير مسجلة، أو سحب العينة، أو قيد المراجعة)، مع قيمتها
-    المطالب بها.
+  def_ar: ملفات GSS في قائمة التصفية لدى المركز التي لم يصدر الفريق تقريرها بعد، حسب المرحلة (غير مسجلة، أو سحب العينة، أو قيد المراجعة)، مع قيمتها المطالب بها.
   formula: COUNT and SUM(claimed SAR) of GSS with status Not registered, Sampling or Under review at period end
   unit: Count / SAR
   date_basis: As-of date
@@ -717,8 +751,7 @@ kpis:
   name_en: Claims value submitted and approved
   name_ar: قيمة المطالبات المقدمة والمعتمدة
   def_en: SAR value of claims submitted by TPAs and the value approved for the quarter, by referral type (inside or outside the Kingdom) and provider.
-  def_ar: القيمة بالريال للمطالبات المقدمة من شركات إدارة المطالبات والقيمة المعتمدة منها خلال الربع، حسب نوع الإحالة (داخل المملكة أو خارجها)
-    ومقدم الخدمة.
+  def_ar: القيمة بالريال للمطالبات المقدمة من شركات إدارة المطالبات والقيمة المعتمدة منها خلال الربع، حسب نوع الإحالة (داخل المملكة أو خارجها) ومقدم الخدمة.
   formula: SUM(Total Claimed Amount); SUM(Total Approved Amount)
   unit: SAR
   date_basis: Accounting quarter
@@ -817,8 +850,7 @@ kpis:
   placement: Page
   name_en: Reconciliation exceptions
   name_ar: استثناءات المطابقة
-  def_en: Number and SAR difference of exceptions found when reconciling claims-management records with the Etimad platform (provider name, purchase-order
-    number, amount).
+  def_en: Number and SAR difference of exceptions found when reconciling claims-management records with the Etimad platform (provider name, purchase-order number, amount).
   def_ar: عدد الاستثناءات وفروقاتها بالريال عند مطابقة سجلات إدارة المطالبات مع منصة اعتماد، مثل اختلاف اسم مقدم الخدمة أو رقم أمر الشراء أو القيمة.
   formula: COUNT(exceptions); SUM(difference)
   unit: Count / SAR
@@ -930,8 +962,7 @@ kpis:
   refresh: Daily
   owner: KPMG medical review lead
   target: '-'
-  caveat: 'Suspected fraud is an indicator for escalation, not a determination. Recommended: classify each of the 35 flag codes once in Config
-    (FWA level per code) rather than per row.'
+  caveat: 'Suspected fraud is an indicator for escalation, not a determination. Recommended: classify each of the 35 flag codes once in Config (FWA level per code) rather than per row.'
   decisions: ''
 - id: FW-04
   page: FW
@@ -951,8 +982,7 @@ kpis:
   refresh: Weekly
   owner: KPMG engagement manager
   target: '-'
-  caveat: The Escalation column flags overdue items for internal follow-up; it is not a controlled escalation and is not used. No case details
-    appear on the dashboard.
+  caveat: The Escalation column flags overdue items for internal follow-up; it is not a controlled escalation and is not used. No case details appear on the dashboard.
   decisions: D-14
 - id: FW-05
   page: FW
@@ -961,8 +991,7 @@ kpis:
   name_en: Value-stage funnel
   name_ar: مراحل القيمة
   def_en: 'Value at issue at each stage: identified, validated, endorsed by CNHI, sent to TPA, confirmed, recovered or avoided.'
-  def_ar: 'القيمة محل الملاحظة في كل مرحلة: محددة، ثم معتمدة داخليا، ثم مؤيدة من المركز، ثم مرسلة لشركة إدارة المطالبات، ثم مؤكدة، ثم مستردة أو
-    متجنبة.'
+  def_ar: 'القيمة محل الملاحظة في كل مرحلة: محددة، ثم معتمدة داخليا، ثم مؤيدة من المركز، ثم مرسلة لشركة إدارة المطالبات، ثم مؤكدة، ثم مستردة أو متجنبة.'
   formula: SUM(value) of findings that reached each stage
   unit: SAR
   date_basis: Stage date
@@ -973,8 +1002,7 @@ kpis:
   refresh: Monthly
   owner: KPMG engagement manager
   target: '-'
-  caveat: Identified and Sent to CNHI stages are available today; Status and Date closed are blank for most flags, so resolution stages show 'data
-    capture in progress'.
+  caveat: Identified and Sent to CNHI stages are available today; Status and Date closed are blank for most flags, so resolution stages show 'data capture in progress'.
   decisions: D-03, D-09
 - id: FW-06
   page: FW
@@ -1028,16 +1056,16 @@ kpis:
   unit: Count
   date_basis: Status date
   counting_unit: Recommendation
-  source: F5 Governance register (new)
-  source_columns: ''
+  source: F6 Governance & corrective-action register (older F5 registers still read)
+  source_columns: 'Policy & recommendations: Stage, Proposed date, Approved date, Issued or effective date'
   status: Needs new source
   refresh: Monthly
   owner: KPMG engagement manager
   target: '-'
-  caveat: ''
+  caveat: Accepted = stage Approved or Issued; implemented = Issued. Detail on the Governance page (GC-01, GC-02).
   decisions: ''
 - id: GV-01
-  page: GV
+  page: OP
   tier: 2
   placement: Page
   name_en: Deliverables submitted vs plan
@@ -1048,7 +1076,7 @@ kpis:
   unit: Count
   date_basis: Due date
   counting_unit: Deliverable
-  source: F5 Governance register (new)
+  source: F5 Project delivery register (new)
   source_columns: ''
   status: Needs new source
   refresh: Monthly
@@ -1056,8 +1084,9 @@ kpis:
   target: '-'
   caveat: ''
   decisions: ''
+  section: contract
 - id: GV-02
-  page: GV
+  page: OP
   tier: 2
   placement: Page
   name_en: Deliverables approved by CNHI
@@ -1068,7 +1097,7 @@ kpis:
   unit: Count / %
   date_basis: Approval date
   counting_unit: Deliverable
-  source: F5 Governance register (new)
+  source: F5 Project delivery register (new)
   source_columns: ''
   status: Needs new source
   refresh: Monthly
@@ -1076,8 +1105,9 @@ kpis:
   target: '-'
   caveat: ''
   decisions: D-11
+  section: contract
 - id: GV-03
-  page: GV
+  page: OP
   tier: 3
   placement: Drill-down
   name_en: CNHI approval turnaround
@@ -1088,7 +1118,7 @@ kpis:
   unit: Days
   date_basis: Approval date
   counting_unit: Deliverable
-  source: F5 Governance register (new)
+  source: F5 Project delivery register (new)
   source_columns: ''
   status: Needs new source
   refresh: Monthly
@@ -1096,8 +1126,9 @@ kpis:
   target: '-'
   caveat: Depends on CNHI review cycles; present neutrally.
   decisions: ''
+  section: contract
 - id: GV-04
-  page: GV
+  page: OP
   tier: 2
   placement: Page
   name_en: QA sign-off before submission
@@ -1108,7 +1139,7 @@ kpis:
   unit: '%'
   date_basis: Submission date
   counting_unit: Deliverable
-  source: F5 Governance register (new)
+  source: F5 Project delivery register (new)
   source_columns: ''
   status: Needs new source
   refresh: Monthly
@@ -1116,8 +1147,9 @@ kpis:
   target: 100%
   caveat: ''
   decisions: ''
+  section: contract
 - id: GV-05
-  page: GV
+  page: OP
   tier: 2
   placement: Page
   name_en: Governance meetings held
@@ -1128,7 +1160,7 @@ kpis:
   unit: Count / %
   date_basis: Meeting date
   counting_unit: Meeting
-  source: F5 Governance register (new)
+  source: F5 Project delivery register (new)
   source_columns: ''
   status: Needs new source
   refresh: Monthly
@@ -1136,8 +1168,9 @@ kpis:
   target: 100%
   caveat: ''
   decisions: ''
+  section: contract
 - id: GV-06
-  page: GV
+  page: OP
   tier: 2
   placement: Page
   name_en: Knowledge transfer progress
@@ -1148,7 +1181,7 @@ kpis:
   unit: Count / %
   date_basis: Delivery date
   counting_unit: KT item
-  source: F5 Governance register (new)
+  source: F5 Project delivery register (new)
   source_columns: ''
   status: Needs new source
   refresh: Monthly
@@ -1156,6 +1189,7 @@ kpis:
   target: '-'
   caveat: Supports CNHI's ability to sustain the methodology after the project.
   decisions: ''
+  section: contract
 - id: OP-01
   page: OP
   tier: 2
@@ -1211,7 +1245,7 @@ kpis:
   unit: Person-days
   date_basis: Month of effort
   counting_unit: Person-day
-  source: F5 Governance register (sheets Team effort, CNHI requests, Contract)
+  source: F5 Project delivery register (sheets Team effort, CNHI requests, Contract)
   source_columns: 'Team effort: Workstream, Role, Month, Person-days'
   status: Mapped
   refresh: Monthly
@@ -1232,7 +1266,7 @@ kpis:
   unit: '%'
   date_basis: Month of effort
   counting_unit: Person-day
-  source: F5 Governance register (sheets Team effort, CNHI requests, Contract)
+  source: F5 Project delivery register (sheets Team effort, CNHI requests, Contract)
   source_columns: 'Team effort: Workstream, Person-days'
   status: Mapped
   refresh: Monthly
@@ -1253,7 +1287,7 @@ kpis:
   unit: Person-days
   date_basis: Month of effort
   counting_unit: Person-day
-  source: F5 Governance register (sheets Team effort, CNHI requests, Contract); F3 Actions hours for reference
+  source: F5 Project delivery register (sheets Team effort, CNHI requests, Contract); F3 Actions hours for reference
   source_columns: 'Team effort: Workstream, Role, Person-days'
   status: Mapped
   refresh: Monthly
@@ -1265,7 +1299,7 @@ kpis:
   page: OP
   tier: 2
   placement: Page
-  section: responsive
+  section: effort
   name_en: CNHI requests answered
   name_ar: طلبات المركز التي تمت الاستجابة لها
   def_en: Ad-hoc requests received from CNHI in the period, how many were delivered, how many remain open, and the median working days to deliver.
@@ -1274,7 +1308,7 @@ kpis:
   unit: Count
   date_basis: Date received / delivered
   counting_unit: Request
-  source: F5 Governance register (sheets Team effort, CNHI requests, Contract)
+  source: F5 Project delivery register (sheets Team effort, CNHI requests, Contract)
   source_columns: 'CNHI requests: Date received, Request type, Due date, Delivered date, Hours, Status'
   status: Mapped
   refresh: Monthly
@@ -1286,7 +1320,7 @@ kpis:
   page: OP
   tier: 2
   placement: Page
-  section: responsive
+  section: contract
   name_en: Contract progress
   name_ar: تقدم العقد
   def_en: Month of the 24-month contract reached, and contractual deliverables submitted to date against the contract total.
@@ -1295,7 +1329,7 @@ kpis:
   unit: '% of contract term'
   date_basis: Period end
   counting_unit: Deliverable
-  source: F5 Governance register (sheets Team effort, CNHI requests, Contract)
+  source: F5 Project delivery register (sheets Team effort, CNHI requests, Contract)
   source_columns: 'Contract: start date, duration; Deliverables: type, Submitted date; Knowledge transfer'
   status: Mapped
   refresh: Monthly
@@ -1316,7 +1350,7 @@ kpis:
   unit: FTE
   date_basis: Month of effort
   counting_unit: Person-day
-  source: F5 Governance register (sheets Team effort, CNHI requests, Contract)
+  source: F5 Project delivery register (sheets Team effort, CNHI requests, Contract)
   source_columns: 'Team effort: Role, Month, Person-days; Contract: Physicians (FTE), Finance consultants (FTE)'
   status: Mapped
   refresh: Monthly
@@ -1347,3 +1381,192 @@ kpis:
   caveat: KPMG users only. Complexity differs by case, so compare a workstream with itself over time, not across workstreams.
   decisions: D-22
   audience: kpmg
+- id: GC-09
+  page: GC
+  tier: 1
+  placement: Page - top, with the action tracker
+  section: status
+  name_en: Corrective-action status
+  name_ar: حالة الإجراءات التصحيحية
+  def_en: 'Every corrective action by status as at the period end (or today), calculated from its dates: overdue, due soon, on track, not started, completed with evidence pending or verified, cancelled; with the age of open actions.'
+  def_ar: 'جميع الإجراءات التصحيحية حسب حالتها حتى نهاية الفترة (أو اليوم)، محسوبة من تواريخها: متأخر، يستحق قريبا، في المسار، لم يبدأ، منجز بانتظار الدليل أو موثق، ملغى؛ مع عمر الإجراءات المفتوحة.'
+  formula: Status rules in insights/actions.py; due soon = due within 7 days; headline = COUNT(overdue)
+  unit: Count
+  date_basis: As-at date (period end or today)
+  counting_unit: Action
+  source: F6 Governance & corrective-action register
+  source_columns: 'Corrective actions: Opened, Due, Completed dates, Evidence reference, Status (Cancelled only)'
+  status: Mapped
+  refresh: Weekly
+  owner: KPMG engagement manager
+  target: 0 overdue
+  caveat: Status is never typed. A warning shows when the register has not been uploaded for more than 7 days. The action tracker lists every action, with history and downloads.
+  decisions: D-23, D-24
+- id: GC-01
+  page: GC
+  tier: 2
+  placement: Page
+  name_en: Policy and manual changes
+  name_ar: تحديث السياسات والأدلة
+  def_en: Recommendations to CNHI that change a policy, manual, contract, pricing rule, process or control, by stage, and how many became effective in the period.
+  def_ar: التوصيات المقدمة للمركز لتغيير سياسة أو دليل أو عقد أو قاعدة تسعير أو إجراء أو ضابط رقابي، حسب المرحلة، وعدد ما أصبح ساريا في الفترة.
+  formula: COUNT(recommendations proposed <= period end) by Stage and Type; COUNT(issued in period)
+  unit: Count
+  date_basis: Proposed and issued dates
+  counting_unit: Recommendation
+  source: F6 Governance & corrective-action register
+  source_columns: 'Policy & recommendations: Type, Document or policy affected, Stage, dates'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Stage is the current stage recorded in the register.
+  decisions: D-23
+  section: policy
+- id: GC-02
+  page: GC
+  tier: 2
+  placement: Page
+  name_en: Time from recommendation to change
+  name_ar: المدة من التوصية إلى التغيير
+  def_en: Median days from proposing a change to CNHI approval, and from approval to the change being issued or effective; plus the age of items still awaiting a decision.
+  def_ar: وسيط الأيام من اقتراح التغيير إلى اعتماده من المركز، ومن الاعتماد إلى إصداره أو سريانه؛ مع عمر البنود التي ما زالت بانتظار القرار.
+  formula: MEDIAN(Approved date - Proposed date) for approvals in period; MEDIAN(Issued - Approved) for issues in period
+  unit: Days
+  date_basis: Approved / issued date
+  counting_unit: Recommendation
+  source: F6 Governance & corrective-action register
+  source_columns: 'Policy & recommendations: Proposed, Approved, Issued or effective dates'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Calendar days.
+  decisions: D-23
+  section: policy
+- id: GC-03
+  page: GC
+  tier: 2
+  placement: Page
+  name_en: CNHI decisions on findings
+  name_ar: قرارات المركز بشأن الملاحظات
+  def_en: 'Items submitted to CNHI for a decision (recoveries, corrective-action plans, contract actions, referrals, policy approvals): decided in the period, outcome mix, pending at period end and median days to decision.'
+  def_ar: 'البنود المقدمة للمركز لاتخاذ قرار (استرداد، خطط تصحيحية، إجراءات تعاقدية، إحالات، اعتماد سياسات): ما تم البت فيه خلال الفترة، وتوزيع القرارات، والمعلق بنهاية الفترة، ووسيط الأيام حتى القرار.'
+  formula: COUNT(decided in period) by Decision; COUNT(submitted <= end, undecided at end); MEDIAN(Decision date - Date submitted)
+  unit: Count
+  date_basis: Decision date
+  counting_unit: Decision
+  source: F6 Governance & corrective-action register
+  source_columns: 'Decisions: Date submitted, Topic, Value at stake, Decision, Decision date, Minutes reference'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Recorded by KPMG from CNHI minutes; every decision carries its minutes reference.
+  decisions: D-23
+  section: decisions
+- id: GC-04
+  page: GC
+  tier: 2
+  placement: Page
+  name_en: Corrective actions on TPAs
+  name_ar: الإجراءات التصحيحية على شركات إدارة المطالبات
+  def_en: 'Corrective actions on TPAs (reprocessing, recovery, formal notice, service-level penalty, process fix, action plan): open, overdue, opened and completed in the period, by TPA.'
+  def_ar: 'الإجراءات التصحيحية على شركات إدارة المطالبات (إعادة معالجة، استرداد، إنذار رسمي، غرامة مستوى خدمة، إصلاح إجراء، خطة تصحيحية): المفتوح والمتأخر وما فتح وأنجز في الفترة، حسب الشركة.'
+  formula: COUNT(TPA actions open at period end); overdue = open and due date passed
+  unit: Count
+  date_basis: Opened, due and completed dates
+  counting_unit: Action
+  source: F6 Governance & corrective-action register
+  source_columns: 'Corrective actions: Target type = TPA, Target name, Action type, dates, Status, Value agreed'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: TPAs are named.
+  decisions: D-23
+  section: actions
+- id: GC-05
+  page: GC
+  tier: 2
+  placement: Page
+  name_en: TPA actions completed on time
+  name_ar: إنجاز الشركات للإجراءات في موعدها
+  def_en: Share of TPA corrective actions completed in the period by their due date, with the number still open past due.
+  def_ar: نسبة الإجراءات التصحيحية على الشركات التي أنجزت خلال الفترة في موعدها أو قبله، مع عدد المفتوح بعد موعده.
+  formula: COUNT(completed in period, Completed <= Due) / COUNT(completed in period with a due date)
+  unit: '%'
+  date_basis: Completed date
+  counting_unit: Action
+  source: F6 Governance & corrective-action register
+  source_columns: 'Corrective actions: Due date, Completed date'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Measures the TPA's response against the agreed date.
+  decisions: D-23
+  section: actions
+- id: GC-06
+  page: GC
+  tier: 2
+  placement: Page
+  name_en: Corrective actions on providers
+  name_ar: الإجراءات التصحيحية على مقدمي الخدمة
+  def_en: Corrective actions on providers by type (recovery, education, pre-authorization restriction, contract review, referral for investigation), open at period end, and providers with repeat actions.
+  def_ar: الإجراءات التصحيحية على مقدمي الخدمة حسب النوع (استرداد، توعية، تقييد الموافقات المسبقة، مراجعة العقد، إحالة للتحقيق)، والمفتوح بنهاية الفترة، ومقدمو الخدمة ذوو الإجراءات المتكررة.
+  formula: COUNT(provider actions opened <= end) by Action type; open at end; providers with 2+ actions
+  unit: Count
+  date_basis: Opened date
+  counting_unit: Action
+  source: F6 Governance & corrective-action register
+  source_columns: 'Corrective actions: Target type = Provider, Target name, Action type, Decision ID'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Providers are named only for approved decisions and never for investigation referrals (counts only). Other names are discarded at upload (D-23).
+  decisions: D-23
+  section: actions
+- id: GC-07
+  page: GC
+  tier: 2
+  placement: Page
+  name_en: Recovery from corrective actions
+  name_ar: الاسترداد من الإجراءات التصحيحية
+  def_en: SAR recovered against SAR agreed for recovery in corrective actions on TPAs and providers, cumulative to period end.
+  def_ar: المبالغ المستردة مقابل المبالغ المتفق على استردادها في الإجراءات التصحيحية على الشركات ومقدمي الخدمة، تراكميا حتى نهاية الفترة.
+  formula: SUM(Value recovered) / SUM(Value agreed for recovery), actions opened <= period end
+  unit: SAR / %
+  date_basis: Opened date (cumulative)
+  counting_unit: Action
+  source: F6 Governance & corrective-action register
+  source_columns: 'Corrective actions: Value agreed for recovery (SAR), Value recovered (SAR)'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: 'This is the Recovered stage of D-03: cash actually recovered, unlike the values identified elsewhere.'
+  decisions: D-23
+  section: effect
+- id: GC-08
+  page: GC
+  tier: 2
+  placement: Page
+  name_en: Effect of corrective actions
+  name_ar: أثر الإجراءات التصحيحية
+  def_en: For completed actions linked to a flag code, the level of the same finding for the same TPA or provider in the 90 days before the action opened and the 90 days after it was completed.
+  def_ar: 'للإجراءات المنجزة المرتبطة برمز ملاحظة: مستوى الملاحظة نفسها لدى الشركة أو مقدم الخدمة نفسه خلال 90 يوما قبل فتح الإجراء و90 يوما بعد إنجازه.'
+  formula: 'TPA: encounters with the flag / encounters reviewed for that TPA; provider: confirmed flags per month. Improved = 10% or more lower after'
+  unit: '% of actions'
+  date_basis: Opened and completed dates
+  counting_unit: Action
+  source: F6 Governance & corrective-action register
+  source_columns: 'Corrective actions: Flag code, Opened date, Completed date; F1 Daily Log and Daily Intake'
+  status: Mapped
+  refresh: Monthly
+  owner: KPMG engagement manager
+  target: '-'
+  caveat: Needs at least 30 days of review data after completion. A change in findings has several causes; read it as an indicator, not proof.
+  decisions: D-23
+  section: effect

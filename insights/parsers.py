@@ -499,32 +499,39 @@ def to_month(v):
     return ""
 
 
+def sheet_rows(wb, warn, sheet, must, fields, optional=False):
+    """Rows of a register sheet as dicts. fields: key -> (header, kind) with kind d(ate), n(umber) or t(ext).
+    The example row (first field starting with EXAMPLE) and blank rows are skipped."""
+    ws = find_sheet(wb, sheet, required=False)
+    if ws is None:
+        if not optional:
+            warn.append(f"Sheet '{sheet}' not found.")
+        return []
+    t = Table(ws, must, max_col=24)
+    out = []
+    for r in t.rows:
+        rec = {}
+        for key, (col, kind) in fields.items():
+            v = t.get(r, col)
+            rec[key] = to_date(v) if kind == "d" else to_num(v) if kind == "n" else to_text(v)
+        if any(v not in (None, "") for v in rec.values()) and not str(rec.get(list(fields)[0], "")).upper().startswith("EXAMPLE"):
+            out.append(rec)
+    return out
+
+
 def parse_f5(path):
     wb = open_book(path)
     warn = []
 
-    def rows(sheet, must, fields):
-        ws = find_sheet(wb, sheet, required=False)
-        if ws is None:
-            warn.append(f"Sheet '{sheet}' not found.")
-            return []
-        t = Table(ws, must, max_col=20)
-        out = []
-        for r in t.rows:
-            rec = {}
-            for key, (col, kind) in fields.items():
-                v = t.get(r, col)
-                rec[key] = to_date(v) if kind == "d" else to_num(v) if kind == "n" else to_text(v)
-            if any(rec.values()) and not str(rec.get(list(fields)[0], "")).upper().startswith("EXAMPLE"):
-                out.append(rec)
-        return out
+    def rows(sheet, must, fields, optional=False):
+        return sheet_rows(wb, warn, sheet, must, fields, optional)
 
     deliverables = rows("Deliverables", ["Deliverable type", "Due date"], {
         "type": ("Deliverable type", "t"), "period": ("Period", "t"), "due": ("Due date", "d"), "qa": ("QA sign-off date", "d"),
         "submitted": ("Submitted date", "d"), "approved": ("CNHI approval date", "d"), "ref": ("Reference", "t")})
     meetings = rows("Meetings", ["Meeting type", "Planned date"], {
         "type": ("Meeting type", "t"), "planned": ("Planned date", "d"), "held": ("Held date", "d")})
-    recs = rows("Recommendations", ["Recommendation ID", "Status"], {
+    recs = rows("Recommendations", ["Recommendation ID", "Status"], optional=True, fields={   # moved to F6; older registers still read
         "id": ("Recommendation ID", "t"), "title": ("Title", "t"), "root": ("Root cause", "t"), "owner": ("Owner", "t"),
         "raised": ("Raised date", "d"), "status": ("Status", "t"), "accepted": ("Accepted date", "d"),
         "implemented": ("Implemented date", "d")})
@@ -553,7 +560,7 @@ def parse_f5(path):
                 contract[k] = to_date(r[1]) if k == "start" else to_num(r[1])
     if not contract.get("start"):
         warn.append("Contract sheet: the contract start date is blank; contract-to-date figures start from the earliest data.")
-    summary = {"Deliverables": len(deliverables), "Meetings": len(meetings), "Recommendations": len(recs),
+    summary = {"Deliverables": len(deliverables), "Meetings": len(meetings),
                "Knowledge-transfer items": len(kt), "Team effort rows": len(effort),
                "Person-days recorded": round(sum(e["days"] for e in effort), 1), "CNHI requests": len(requests),
                "Contract start": contract.get("start") or "-"}
@@ -561,7 +568,93 @@ def parse_f5(path):
                           requests=requests, contract=contract), summary=summary, warnings=warn)
 
 
-PARSERS = {"F1": parse_f1, "F2": parse_f2, "F3": parse_f3, "F4": parse_f4, "F5": parse_f5}
+# ------------------------------------------------------------------ F6 governance & corrective-action register
+APPROVED = ("approved", "approved with changes")
+NOTE_MAX = int((config.SETTINGS.get("corrective_actions") or {}).get("status_note_max", 200))
+
+
+def parse_f6(path):
+    """Recommendations, CNHI decisions and corrective actions. Provider names are kept only for approved decisions and
+    never for investigation referrals (decision of 29 Oct 2026); otherwise they are discarded here and never stored."""
+    wb = open_book(path)
+    warn = []
+    recs = sheet_rows(wb, warn, "Policy & recommendations", ["Recommendation ID", "Stage"], {
+        "id": ("Recommendation ID", "t"), "title": ("Title", "t"), "type": ("Type", "t"),
+        "document": ("Document or policy affected", "t"), "source_type": ("Source type", "t"), "source": ("Source reference", "t"),
+        "root": ("Root cause", "t"), "stage": ("Stage", "t"), "proposed": ("Proposed date", "d"), "approved": ("Approved date", "d"),
+        "issued": ("Issued or effective date", "d"), "owner": ("CNHI owner (unit)", "t")})
+    raw_dec = sheet_rows(wb, warn, "Decisions", ["Decision ID", "Decision"], {
+        "id": ("Decision ID", "t"), "submitted": ("Date submitted", "d"), "subject_type": ("Subject type", "t"),
+        "subject": ("Subject name", "t"), "topic": ("Topic", "t"), "source": ("Source reference", "t"),
+        "value": ("Value at stake (SAR)", "n"), "forum": ("Forum", "t"), "decision": ("Decision", "t"),
+        "decided": ("Decision date", "d"), "minutes": ("Minutes reference", "t")})
+    raw_act = sheet_rows(wb, warn, "Corrective actions", ["Action ID", "Target type"], {
+        "id": ("Action ID", "t"), "decision_id": ("Decision ID", "t"), "target_type": ("Target type", "t"),
+        "target": ("Target name", "t"), "tpa": ("TPA", "t"), "type": ("Action type", "t"), "code": ("Flag code", "t"),
+        "source": ("Source reference", "t"), "opened": ("Opened date", "d"), "due": ("Due date", "d"),
+        "completed": ("Completed date", "d"), "status": ("Status", "t"),
+        "agreed": ("Value agreed for recovery (SAR)", "n"), "recovered": ("Value recovered (SAR)", "n"),
+        "evidence": ("Evidence reference", "t"), "owner": ("Action owner (unit)", "t"), "updated": ("Last update date", "d"),
+        "note": ("Status note (shown on dashboard)", "t")})
+    withheld = 0
+    decisions = []
+    for d in raw_dec:
+        d["decision"] = d["decision"] or "Pending"
+        if norm(d["subject_type"]) == "tpa":
+            d["subject"] = tpa_name(d["subject"])
+        elif norm(d["subject_type"]) == "provider":
+            ok = norm(d["decision"]) in APPROVED and norm(d["topic"]) != "investigation referral"
+            if not ok and d["subject"]:
+                withheld += 1
+            d["subject"] = d["subject"] if ok else ""
+        if d["decided"] and d["decision"] == "Pending":
+            warn.append(f"Decision {d['id']}: has a decision date but the decision is Pending.")
+        decisions.append(d)
+    dmap = {d["id"]: d for d in decisions}
+    actions = []
+    for a in raw_act:
+        dec = dmap.get(a["decision_id"])
+        if a["decision_id"] and dec is None:
+            warn.append(f"Action {a['id']}: Decision ID {a['decision_id']} is not in the Decisions sheet.")
+        is_tpa = norm(a["target_type"]) == "tpa"
+        a["target_type"] = "TPA" if is_tpa else "Provider"
+        a["tpa"] = tpa_name(a["tpa"] or (a["target"] if is_tpa else ""))
+        a["key"] = ""
+        if is_tpa:
+            a["target"] = tpa_name(a["target"])
+        else:
+            a["key"] = deid.ref(norm(a["target"])) if a["target"] else ""      # matches the provider in the daily register
+            ok = (dec is not None and norm(dec["decision"]) in APPROVED and norm(a["type"]) != "referral for investigation"
+                  and norm(a["status"]) != "cancelled")
+            if not ok and a["target"]:
+                withheld += 1
+            a["target"] = a["target"] if ok else ""
+        a["status"] = a["status"] or ("Completed" if a["completed"] else "Open")
+        if norm(a["status"]) == "completed" and not a["completed"]:
+            warn.append(f"Action {a['id']}: status Completed without a completed date; it is left out of on-time and effect KPIs.")
+        if not a["due"] and norm(a["status"]) not in ("completed", "cancelled"):
+            warn.append(f"Action {a['id']}: no due date, so it cannot be shown as overdue.")
+        a["code"] = (a["code"] or "").upper()
+        note = re.sub(r"\s+", " ", a.get("note") or "").strip()
+        if re.search(r"\d{10}", note):                     # looks like a national ID or phone number: never stored
+            warn.append(f"Action {a['id']}: the status note contains a 10-digit number and was not kept.")
+            note = ""
+        if len(note) > NOTE_MAX:
+            warn.append(f"Action {a['id']}: status note shortened to {NOTE_MAX} characters.")
+            note = note[:NOTE_MAX - 1] + "…"
+        a["note"] = note
+        if a["completed"] and not a.get("evidence"):
+            warn.append(f"Action {a['id']}: completed without an evidence reference; shown as 'Completed - evidence pending'.")
+        actions.append(a)
+    summary = {"Recommendations": len(recs), "Decisions": len(decisions),
+               "Corrective actions": len(actions),
+               "on TPAs": sum(1 for a in actions if a["target_type"] == "TPA"),
+               "on providers": sum(1 for a in actions if a["target_type"] == "Provider"),
+               "Provider names withheld (not approved or investigation referral)": withheld}
+    return dict(data=dict(recommendations=recs, decisions=decisions, actions=actions), summary=summary, warnings=warn)
+
+
+PARSERS = {"F1": parse_f1, "F2": parse_f2, "F3": parse_f3, "F4": parse_f4, "F5": parse_f5, "F6": parse_f6}
 
 
 def parse(kind, path, label=""):

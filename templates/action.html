@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ r.id }}{% endblock %}
+{% block content %}
+<p class="small noprint"><a href="{{ url_for('action_tracker') }}{{ '?asof=' ~ asof_arg if asof_arg }}">← {{ pick('Corrective-action tracker', 'متابعة الإجراءات التصحيحية') }}</a></p>
+<div class="pagehead"><div>
+  <h1 dir="auto"><span dir="ltr">{{ r.id }}</span> · {{ gl(r.type) }}</h1>
+  <div class="sub"><span class="stat t-{{ STATUS[r.st][2] }}">{{ label(r.st) }}</span> {{ pick('as at', 'حتى') }} <span dir="ltr">{{ asof }}</span>
+    {% if r.days_over %}<span class="bad">· {{ r.days_over }} {{ pick('days overdue', 'يوم تأخير') }}</span>{% endif %}</div>
+</div></div>
+<div class="grid">
+  <div class="card">
+    <h3>{{ pick('Action', 'الإجراء') }}</h3>
+    <table class="t kv">
+      <tr><th>{{ pick('Target', 'الجهة') }}</th><td>{{ tname(r) }} ({{ gl(r.target_type) }})</td></tr>
+      <tr><th>TPA</th><td>{{ r.tpa or '-' }}</td></tr>
+      <tr><th>{{ pick('Flag code', 'رمز الملاحظة') }}</th><td dir="ltr">{{ r.code or '-' }}</td></tr>
+      <tr><th>{{ pick('Source reference', 'المرجع') }}</th><td dir="ltr">{{ r.source or '-' }}</td></tr>
+      <tr><th>{{ pick('Action owner (unit)', 'الجهة المسؤولة') }}</th><td>{{ r.owner or '-' }}</td></tr>
+      <tr><th>{{ pick('Evidence reference', 'مرجع الدليل') }}</th><td dir="ltr">{{ r.evidence or '-' }}</td></tr>
+      <tr><th>{{ pick('Status note', 'ملاحظة الحالة') }}</th><td>{{ r.note or '-' }}{% if r.updated %} <span class="small muted">({{ pick('updated', 'حدث') }} <span dir="ltr">{{ r.updated }}</span>)</span>{% endif %}</td></tr>
+    </table>
+    {% if r.agreed %}
+    <h3>{{ pick('Recovery', 'الاسترداد') }}</h3>
+    <div class="t-green"><div class="meter plain"><div style="width: {{ [((r.recovered or 0) / r.agreed * 100)|round, 100]|min }}%"></div></div></div>
+    <p class="small"><span dir="ltr">SAR {{ '{:,.0f}'.format(r.recovered or 0) }}</span> {{ pick('recovered of', 'مسترد من') }} <span dir="ltr">SAR {{ '{:,.0f}'.format(r.agreed) }}</span> {{ pick('agreed', 'متفق عليه') }}</p>
+    {% endif %}
+  </div>
+  <div class="card">
+    <h3>{{ pick('Timeline', 'التسلسل الزمني') }}</h3>
+    <ol class="timeline">
+      {% set d = r.decision %}
+      <li class="{{ 'done' if d.submitted }}"><b>{{ pick('Submitted to CNHI', 'قدم للمركز') }}</b> <span dir="ltr">{{ d.submitted or '-' }}</span>{% if d.forum %} · {{ d.forum }}{% endif %}</li>
+      <li class="{{ 'done' if d.decided }}"><b>{{ pick('CNHI decision', 'قرار المركز') }}</b> {{ gl(d.decision, True) if d.decision else '-' }} <span dir="ltr">{{ d.decided or '' }}</span>{% if d.minutes %} · <span dir="ltr">{{ d.minutes }}</span>{% endif %}</li>
+      <li class="{{ 'done' if r.opened }}"><b>{{ pick('Action opened', 'فتح الإجراء') }}</b> <span dir="ltr">{{ r.opened or '-' }}</span></li>
+      <li class="{{ 'late' if r.st == 'overdue' else 'done' if r.completed }}"><b>{{ pick('Due', 'الاستحقاق') }}</b> <span dir="ltr">{{ r.due or '-' }}</span></li>
+      <li class="{{ 'done' if r.completed }}"><b>{{ pick('Completed', 'أنجز') }}</b> <span dir="ltr">{{ r.completed or '-' }}</span></li>
+      <li class="{{ 'done' if r.evidence and r.completed }}"><b>{{ pick('Evidence', 'الدليل') }}</b> <span dir="ltr">{{ r.evidence or '-' }}</span></li>
+    </ol>
+    {% if rec %}<p class="small">{{ pick('Linked recommendation', 'التوصية المرتبطة') }}: <span dir="ltr">{{ rec.id }}</span> {{ rec.title }} ({{ rec.stage }})</p>{% endif %}
+  </div>
+  <div class="card">
+    <h3>{{ pick('Documents', 'المستندات') }}</h3>
+    {% if docs %}<ul class="plain">{% for x in docs %}<li><a href="{{ url_for('document_view', doc_id=x.id) }}">{{ x.title }}</a>
+      <span class="small muted">· {{ pick(CATS[x.category][0], CATS[x.category][1]) }}{% if x.via == 'decision' %} · {{ pick('via decision', 'عبر القرار') }} <span dir="ltr">{{ r.decision_id }}</span>{% endif %}</span>
+      · <a class="small" href="{{ url_for('document_download', doc_id=x.id) }}">{{ pick('Download', 'تنزيل') }}</a></li>{% endfor %}</ul>
+    {% else %}<p class="muted">{{ pick('No document linked yet.', 'لا توجد مستندات مرتبطة بعد.') }}</p>{% endif %}
+    {% if r.st == 'done_pending' and docs|selectattr('via', 'equalto', 'action')|selectattr('category', 'in', ['evidence', 'letter'])|list %}
+    <div class="flash">{{ pick('An evidence document is on file. Enter its reference in the Evidence reference column of the register (F6) to mark this action verified.',
+      'يوجد مستند دليل في المكتبة. أدخل مرجعه في عمود مرجع الدليل في السجل (F6) لاعتماد الإجراء كمنجز وموثق.') }}</div>{% endif %}
+    {% if can_upload %}<p><a class="btn small" href="{{ url_for('document_upload', kind='action', ref=r.id, category='evidence') }}">{{ pick('Add evidence or correspondence', 'إضافة دليل أو مراسلة') }}</a></p>{% endif %}
+  </div>
+  <div class="card">
+    <h3>{{ pick('Status history', 'سجل الحالة') }}</h3>
+    {% if hist %}<table class="t hist"><thead><tr><th>{{ pick('Register published', 'نشر السجل') }}</th><th>{{ pick('Status', 'الحالة') }}</th></tr></thead>
+      <tbody>{% for dte, s in hist %}<tr><td dir="ltr">{{ dte }}</td><td><span class="stat t-{{ STATUS[s][2] }}">{{ label(s) }}</span></td></tr>{% endfor %}</tbody></table>
+      <p class="small muted">{{ pick('Status at each published version of the register; only changes are listed.', 'الحالة في كل نسخة منشورة من السجل؛ تعرض التغيرات فقط.') }}</p>
+    {% else %}<p class="muted">-</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

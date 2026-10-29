@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ d.title }}{% endblock %}
+{% block content %}
+<p class="small"><a href="{{ url_for('documents') }}">← {{ pick('Documents', 'المستندات') }}</a></p>
+<div class="pagehead"><div>
+  <h1>{{ d.title }}</h1>
+  <div class="sub">{{ pick(CATS[d.category][0], CATS[d.category][1]) }}{% if d.period %} · <span dir="ltr">{{ d.period }}</span>{% endif %}
+    {% if d.status == 'superseded' %}<span class="badge warn">{{ pick('Earlier version', 'نسخة سابقة') }}</span>{% endif %}
+    {% if can_edit %}{% if d.visibility == 'shared' %}<span class="stat t-green">{{ pick('KPMG and CNHI', 'KPMG والمركز') }}</span>{% else %}<span class="stat t-slate">{{ pick('KPMG only', 'KPMG فقط') }}</span>{% endif %}{% endif %}</div>
+</div>
+<div class="toolbar">
+  <a class="btn primary" href="{{ url_for('document_download', doc_id=d.id) }}">{{ pick('Download', 'تنزيل') }}</a>
+  {% if can_edit and d.status == 'active' %}<a class="btn" href="{{ url_for('document_upload', parent=d.id) }}">{{ pick('Upload a new version', 'تحميل نسخة جديدة') }}</a>{% endif %}
+</div></div>
+<div class="grid">
+  <div class="card">
+    <h3>{{ pick('File', 'الملف') }}</h3>
+    <table class="t kv">
+      <tr><th>{{ pick('File name', 'اسم الملف') }}</th><td dir="ltr">{{ d.filename }}</td></tr>
+      <tr><th>{{ pick('Size', 'الحجم') }}</th><td dir="ltr">{{ (d.size / 1024)|round|int }} KB</td></tr>
+      <tr><th>{{ pick('Uploaded', 'التحميل') }}</th><td><span dir="ltr">{{ d.uploaded_at[:16] }}</span>{% if can_edit %} · {{ d.uploaded_by }}{% endif %}</td></tr>
+      {% if d.description %}<tr><th>{{ pick('Description', 'الوصف') }}</th><td>{{ d.description }}</td></tr>{% endif %}
+      {% if can_edit %}<tr><th>{{ pick('Identifier check', 'فحص بيانات التعريف') }}</th><td>{{ {'clean': pick('Passed', 'سليم'), 'ids_found_confirmed': pick('Possible identifiers; uploader confirmed none', 'احتمال وجود بيانات تعريف؛ أكد المحمّل عدم وجودها'), 'no_text_confirmed': pick('No readable text; uploader confirmed none', 'لا يوجد نص مقروء؛ أكد المحمّل عدم وجودها')}.get(d.id_check, d.id_check) }}</td></tr>{% endif %}
+      <tr><th>{{ pick('Fingerprint (SHA-256)', 'البصمة') }}</th><td class="small" dir="ltr">{{ d.sha256[:16] }}…</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h3>{{ pick('Linked to', 'مرتبط بـ') }}</h3>
+    {% if links %}<ul class="plain">{% for k, ref in links %}<li>{{ pick(KINDS[k][0], KINDS[k][1]) }}:
+      {% if k == 'action' %}<a href="{{ url_for('action_detail', aid=ref) }}" dir="ltr">{{ labels[k].get(ref, ref) }}</a>
+      {% else %}<a href="{{ url_for('documents', kind=k, ref=ref) }}">{{ labels[k].get(ref, ref) }}</a>{% endif %}</li>{% endfor %}</ul>
+    {% else %}<p class="muted">-</p>{% endif %}
+    <h3>{{ pick('Versions', 'النسخ') }}</h3>
+    <table class="t">{% for v in versions %}<tr><td><a href="{{ url_for('document_view', doc_id=v.id) }}" dir="ltr">{{ v.uploaded_at[:16] }}</a></td>
+      <td dir="ltr">{{ v.filename }}</td><td>{% if v.status == 'active' %}<span class="stat t-green">{{ pick('Current', 'الحالية') }}</span>{% endif %}</td></tr>{% endfor %}</table>
+  </div>
+  {% if can_edit and d.status == 'active' %}
+  <div class="card wide docform">
+    <h3>{{ pick('Edit details, visibility and links', 'تعديل البيانات والإتاحة والروابط') }}</h3>
+    <form method="post"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="act" value="edit">
+      {% set v = dict(title=d.title, category=d.category, period=d.period, description=d.description, visibility=d.visibility, links=links) %}
+      {% include "_doc_fields.html" %}
+      <button class="btn primary">{{ pick('Save changes', 'حفظ التغييرات') }}</button>
+    </form>
+    {% if g.user.role == 'admin' %}
+    <form method="post" class="delform"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="act" value="delete">
+      <button class="btn" data-confirm="{{ pick('Delete this document and all its versions for good?', 'حذف هذا المستند وكل نسخه نهائيا؟') }}">{{ pick('Delete the document and its versions', 'حذف المستند ونسخه') }}</button></form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

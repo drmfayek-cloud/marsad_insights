@@ -34,3 +34,14 @@ gss_critical: [K1, K2, K3, K4]
 
 # Dispute ageing bands for HD-02 (days since receipt)
 dispute_age_bands: [5, 10, 20]
+
+# Corrective-action tracker (Governance page). Status is calculated, never typed.
+corrective_actions:
+  due_soon_days: 7        # open actions due within this many days show as 'Due soon' (amber)
+  stale_days: 7           # warn when the F6 register has not been uploaded for longer than this
+  status_note_max: 200    # characters kept from the status note
+
+# F6 candidate list (upload page): daily-register decision candidates per TPA and month
+candidates:
+  min_value_sar: 100000     # group (TPA, flag code, month) must be worth at least this
+  top_per_tpa_month: 5      # and be among the largest this many for that TPA and month

@@ -1,6 +1,7 @@
 """End-to-end checks on synthetic data. Run: python -m unittest discover -s tests"""
 import datetime as dt
 import io
+import json
 import os
 import re
 import shutil
@@ -267,6 +268,203 @@ class AppTests(unittest.TestCase):
             self.assertEqual(db.q1("SELECT mfa_enabled FROM users WHERE email='mfa@test.local'")["mfa_enabled"], 1)
         finally:
             A.app.config["REQUIRE_MFA"] = False
+
+    def test_12_governance_corrective_actions_register(self):
+        r = self.c.get("/data/template/corrective-actions.xlsx")
+        self.assertEqual(r.status_code, 200)
+        wb = load_workbook(io.BytesIO(r.data))
+
+        def put(ws, row, values):
+            cols = {c.value: c.column_letter for c in ws[4] if c.value}
+            for k, v in values.items():
+                ws[f"{cols[k]}{row}"] = v
+        put(wb["Policy & recommendations"], 6, {"Recommendation ID": "R1", "Type": "Policy or manual change", "Stage": "Issued",
+                                                "Proposed date": dt.date(2026, 8, 1), "Approved date": dt.date(2026, 8, 21),
+                                                "Issued or effective date": dt.date(2026, 9, 10)})
+        dec = wb["Decisions"]
+        put(dec, 6, {"Decision ID": "D1", "Date submitted": dt.date(2026, 9, 1), "Subject type": "TPA", "Subject name": "globemed",
+                     "Topic": "Recovery", "Decision": "Approved", "Decision date": dt.date(2026, 9, 8)})
+        put(dec, 7, {"Decision ID": "D2", "Date submitted": dt.date(2026, 9, 2), "Subject type": "Provider",
+                     "Subject name": "Hospital Approved", "Topic": "Recovery", "Decision": "Approved", "Decision date": dt.date(2026, 9, 9)})
+        put(dec, 8, {"Decision ID": "D3", "Date submitted": dt.date(2026, 9, 3), "Subject type": "Provider",
+                     "Subject name": "Hospital Pending", "Topic": "Contract action", "Decision": "Pending"})
+        act = wb["Corrective actions"]
+        rows = [("A1", "D1", "TPA", "globemed", "Recover overpayment", dt.date(2026, 9, 9), dt.date(2026, 9, 20), None, 1000, 400),
+                ("A2", "D2", "Provider", "Hospital Approved", "Recover overpayment", dt.date(2026, 9, 10), dt.date(2026, 10, 30),
+                 dt.date(2026, 9, 25), 500, 500),
+                ("A3", "D2", "Provider", "Hospital Referred", "Referral for investigation", dt.date(2026, 9, 10), dt.date(2026, 10, 30), None, 0, 0),
+                ("A4", "D3", "Provider", "Hospital Pending", "Contract review", dt.date(2026, 9, 12), dt.date(2026, 10, 30), None, 0, 0)]
+        for i, (aid, did, tt, name, typ, o, due, comp, ag, rc) in enumerate(rows, start=6):
+            put(act, i, {"Action ID": aid, "Decision ID": did, "Target type": tt, "Target name": name, "Action type": typ,
+                         "Opened date": o, "Due date": due, "Completed date": comp, "Value agreed for recovery (SAR)": ag,
+                         "Value recovered (SAR)": rc, "Status": "Completed" if comp else "Open"})
+        bio = io.BytesIO()
+        wb.save(bio)
+        r = self.upload("F6", bio.getvalue(), "f6.xlsx")
+        self.assertIn("Provider names withheld", self.c.get(r.headers["Location"]).text)
+        self.publish(r.headers["Location"])
+        data = store.current()
+        stored = json.dumps(data["F6"])
+        self.assertIn("Hospital Approved", stored)
+        self.assertNotIn("Hospital Referred", stored)                            # referral: never named
+        self.assertNotIn("Hospital Pending", stored)                             # decision not approved: not named
+        with A.app.test_request_context():
+            from flask import g
+            g.lang = "en"
+            c = kpi.Ctx(data, "2026-09", "", today="2026-10-29")
+            self.assertEqual(kpi.compute("GC-04", c)["raw"], 1)
+            self.assertIn("1 overdue", kpi.compute("GC-04", c)["sub"])           # due 20 Sep, still open at 30 Sep
+            self.assertEqual(kpi.compute("GC-04", c)["table"]["rows"][0][0], "GlobeMed Saudi")   # TPA name normalised
+            g6 = kpi.compute("GC-06", c)
+            self.assertIn("1 referral for investigation", g6["sub"])
+            names = [row[0] for row in g6["table"]["rows"]]
+            self.assertIn("Hospital Approved", names)
+            self.assertTrue(any(n.startswith("Not named") for n in names))
+            self.assertEqual(kpi.compute("GC-07", c)["raw"], 900)
+            self.assertEqual(kpi.compute("GC-03", c)["raw"], 2)
+            self.assertEqual(kpi.compute("GC-02", c)["raw"], None)               # approved in August, not September
+            self.assertEqual(kpi.compute("GC-01", c)["raw"], 1)
+            self.assertEqual(kpi.compute("EX-11", c)["raw"], 3)
+            self.assertIn("1 implemented", kpi.compute("FW-08", c)["sub"])       # FW-08 now reads F6
+        self.assertIn("GC-06", self.c.get("/p/governance?period=2026-09").text)
+
+    def test_13_action_status_tracker_and_candidates(self):
+        from insights import actions, candidates
+        base = dict(status="Open", opened="2026-10-01", due="2026-10-20", completed=None, evidence="")
+        S = actions.status
+        self.assertEqual(S(dict(base, opened=None), "2026-10-10"), "not_started")
+        self.assertEqual(S(base, "2026-10-12"), "on_track")                     # 8 days to due
+        self.assertEqual(S(base, "2026-10-13"), "due_soon")                     # 7 days to due
+        self.assertEqual(S(base, "2026-10-21"), "overdue")
+        self.assertEqual(S(dict(base, completed="2026-10-18"), "2026-10-21"), "done_pending")
+        self.assertEqual(S(dict(base, completed="2026-10-18", evidence="L-1"), "2026-10-21"), "done_verified")
+        self.assertEqual(S(dict(base, completed="2026-10-25"), "2026-10-21"), "overdue")   # completed after the as-at date
+        self.assertEqual(S(dict(base, status="Cancelled"), "2026-10-21"), "cancelled")
+        # status note: a 10-digit number is never stored
+        wb = load_workbook(io.BytesIO(self.c.get("/data/template/corrective-actions.xlsx").data))
+        ws = wb["Corrective actions"]
+        cols = {c.value: c.column_letter for c in ws[4] if c.value}
+        for k, v in {"Action ID": "N1", "Target type": "TPA", "Target name": "NextCare", "Action type": "Formal notice",
+                     "Opened date": dt.date(2026, 9, 1), "Due date": dt.date(2026, 9, 10),
+                     "Status note (shown on dashboard)": "Called 1012345678 about the reply",
+                     "Source reference": "F1:NextCare:DQ-10:2026-09"}.items():
+            ws[f"{cols[k]}6"] = v
+        bio = io.BytesIO()
+        wb.save(bio)
+        r = self.upload("F6", bio.getvalue(), "f6b.xlsx")
+        self.assertIn("10-digit number", self.c.get(r.headers["Location"]).text)
+        self.publish(r.headers["Location"])
+        self.assertNotIn("1012345678", json.dumps(store.current()["F6"]))
+        # tracker, detail and download for a CNHI viewer
+        c2 = A.app.test_client()
+        r = c2.get("/login")
+        c2.post("/login", data=dict(csrf=tok(r.text), email="viewer@test.local", password=NEW_PW))
+        page = c2.get("/p/governance/actions?status=overdue").text
+        self.assertIn("N1", page)
+        self.assertIn("Overdue", page)
+        self.assertEqual(c2.get("/p/governance/actions/N1").status_code, 200)
+        x = c2.get("/p/governance/actions.xlsx")
+        self.assertEqual(x.status_code, 200)
+        xs = load_workbook(io.BytesIO(x.data))["Action tracker"]
+        self.assertEqual(xs["B7"].value, "N1")
+        self.assertEqual(xs["A7"].value, "Overdue")
+        self.assertTrue(db.q1("SELECT 1 AS x FROM audit WHERE action='download_actions'"))
+        # changes since the previous version: A1-A4 of test 12 are gone, N1 is new
+        self.assertIn("New since last upload", page)
+        # candidates: administrators only; a key already in F6 is not offered again
+        self.assertEqual(c2.get("/data/candidates.xlsx").status_code, 403)
+        self.assertEqual(self.c.get("/data/candidates.xlsx").status_code, 200)
+        fl = [dict(status="Confirmed", tpa="NextCare", code="DQ-10", date="2026-09-0%d" % i, action="TPA level", cnhi_response="",
+                   ref=f"R{i}", log_id=f"L{i}", amount=60000) for i in range(1, 4)]
+        fl.append(dict(fl[0], code="EMG-01", amount=5000, ref="R9"))                          # below SAR 100,000
+        fl.append(dict(fl[0], code="BEN-02", cnhi_response="Endorse - route to TPA", ref="R8"))
+        dec, act, _ = candidates.build({"F1": {"flags": fl}})
+        self.assertEqual([r["Source reference"] for r in dec], ["F1:NextCare:DQ-10:2026-09"])   # grouped, 3 encounters
+        self.assertEqual(dec[0]["Value at stake (SAR)"], 180000)
+        self.assertEqual([r["Source reference"] for r in act], ["F1E:NextCare:BEN-02:2026-09"])
+        dec, act, skipped = candidates.build({"F1": {"flags": fl}, "F6": store.current()["F6"]})
+        self.assertEqual((dec, skipped), ([], 1))                                    # key already in F6: not offered
+        # stale register: EX-11 warns
+        db.ex("UPDATE uploads SET published_at='2026-01-01 08:00:00' WHERE id=?", (store.current_ids()["F6"],))
+        with A.app.test_request_context():
+            from flask import g
+            g.lang = "en"
+            ctx = kpi.Ctx(store.current(), "2026-09", "")
+            ctx.meta = {"F6": actions.meta()}
+            self.assertEqual(kpi.compute("EX-11", ctx)["state"], "partial")
+            self.assertIn("last uploaded", kpi.compute("GC-09", ctx)["note"])
+        self.assertIn("days ago", c2.get("/p/governance/actions").text)
+
+    def test_14_documents_library(self):
+        from insights import library, samplefiles
+        from openpyxl import Workbook as WB
+
+        def up(client, name, raw, **meta):
+            r = client.get("/documents/upload")
+            fields = dict(dict(csrf=tok(r.text), category="other", visibility="kpmg", title=""), **meta)
+            fields["file"] = (io.BytesIO(raw), name)
+            return client.post("/documents/upload", data=fields, content_type="multipart/form-data")
+
+        # type checks: content must match the extension; legacy formats refused
+        r = up(self.c, "report.pdf", b"MZ\x90\x00 not a pdf")
+        self.assertIn("does not match its type", r.text)
+        self.assertIn("save the file as .docx", up(self.c, "old.doc", b"\xd0\xcf\x11\xe0").text.lower())
+        self.assertIn("Upload a PDF", up(self.c, "tool.exe", b"MZ").text)
+        # patient identifiers: refused without confirmation, accepted with it (and audited)
+        bad = samplefiles.docx(["Patient name: Example", "National ID 1098765432"])
+        self.assertIn("patient identifiers", up(self.c, "ids.docx", bad).text)
+        r = up(self.c, "ids.docx", bad, confirm="1")
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(db.q1("SELECT 1 AS x FROM audit WHERE action='document_uploaded' AND detail LIKE '%confirmed no patient%'"))
+        wbk = WB()
+        wbk.active.append(["Claim", 2012345678])                          # an iqama-format number stored as a number
+        bio = io.BytesIO()
+        wbk.save(bio)
+        self.assertIn("patient identifiers", up(self.c, "list.xlsx", bio.getvalue()).text)
+        # a clean shared PDF linked to an action, and a KPMG-only Word file
+        r = up(self.c, "Deduction letter.pdf", samplefiles.pdf(["Deduction confirmed for action N1", "Reference CNHI-L-900"]),
+               category="evidence", visibility="shared", title="Deduction letter N1", link_action="N1")
+        shared_id = int(r.headers["Location"].rsplit("/", 1)[1])
+        r = up(self.c, "note.docx", samplefiles.docx(["Internal working note on N1"]), visibility="kpmg", title="Working note",
+               link_action="N1")
+        kpmg_id = int(r.headers["Location"].rsplit("/", 1)[1])
+        self.assertTrue(os.path.exists(library.path(db.q1("SELECT * FROM documents WHERE id=?", (shared_id,)))))
+        # search reads the file text
+        self.assertIn("Deduction letter N1", self.c.get("/documents?q=CNHI-L-900").text)
+        # CNHI viewer: sees and downloads only shared documents, cannot upload
+        c2 = A.app.test_client()
+        r = c2.get("/login")
+        c2.post("/login", data=dict(csrf=tok(r.text), email="viewer@test.local", password=NEW_PW))
+        lst = c2.get("/documents").text
+        self.assertIn("Deduction letter N1", lst)
+        self.assertNotIn("Working note", lst)
+        self.assertEqual(c2.get(f"/documents/{kpmg_id}").status_code, 404)
+        self.assertEqual(c2.get(f"/documents/{kpmg_id}/download").status_code, 404)
+        dl = c2.get(f"/documents/{shared_id}/download")
+        self.assertEqual(dl.status_code, 200)
+        self.assertTrue(dl.data.startswith(b"%PDF-"))
+        self.assertIn("attachment", dl.headers["Content-Disposition"])
+        self.assertEqual(c2.get("/documents/upload").status_code, 403)
+        detail = c2.get("/p/governance/actions/N1").text
+        self.assertIn("Deduction letter N1", detail)                          # linked evidence on the action page
+        self.assertNotIn("Working note", detail)
+        self.assertIn("📎 1", c2.get("/p/governance/actions").text)            # one visible document for N1
+        # new version supersedes the old one
+        r = self.c.get(f"/documents/upload?parent={shared_id}")
+        r = self.c.post("/documents/upload", data=dict(csrf=tok(r.text), parent=shared_id, category="evidence", visibility="shared",
+                                                       title="Deduction letter N1", link_action="N1",
+                                                       file=(io.BytesIO(samplefiles.pdf(["Deduction confirmed, version 2"])), "v2.pdf")),
+                        content_type="multipart/form-data")
+        new_id = int(r.headers["Location"].rsplit("/", 1)[1])
+        self.assertEqual(db.q1("SELECT status FROM documents WHERE id=?", (shared_id,))["status"], "superseded")
+        self.assertNotIn(f"/documents/{shared_id}\"", self.c.get("/documents").text)   # list shows the current version only
+        self.assertIn("Earlier version", self.c.get(f"/documents/{shared_id}").text)
+        # delete: administrators only, file removed
+        r = self.c.get(f"/documents/{new_id}")
+        self.c.post(f"/documents/{new_id}", data=dict(csrf=tok(r.text), act="delete"))
+        self.assertEqual(db.q1("SELECT status FROM documents WHERE id=?", (new_id,))["status"], "deleted")
+        self.assertFalse(os.path.exists(library.path(db.q1("SELECT * FROM documents WHERE id=?", (new_id,)))))
+        self.assertEqual(self.c.get(f"/documents/{new_id}/download").status_code, 404)
 
     def test_10_lockout_after_failed_logins(self):
         other = A.app.test_client()

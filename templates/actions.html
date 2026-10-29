@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}{{ pick('Action tracker', 'متابعة الإجراءات') }}{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <p class="small"><a href="{{ url_for('page', slug='governance', period=asof_arg or None) }}">← {{ pick(pg.en, pg.ar) }}</a></p>
+    <h1>{{ pick('Corrective-action tracker', 'متابعة الإجراءات التصحيحية') }}</h1>
+    <div class="sub">
+      <span class="badge {{ 'ok' if frozen else 'warn' }}">{{ pick('Month-end position, approved', 'وضع نهاية الشهر، معتمد') if frozen else pick('Live', 'مباشر') }}</span>
+      {{ pick('Status as at', 'الحالة حتى') }} <b dir="ltr">{{ asof }}</b>
+      {% if meta.published %} · {{ pick('register uploaded', 'آخر تحميل للسجل') }} <span dir="ltr">{{ meta.published }}</span>{% endif %}
+      · {{ pick('status is calculated from the dates', 'الحالة محسوبة من التواريخ') }}
+    </div>
+  </div>
+  <form class="filters noprint" method="get">
+    <label>{{ pick('As at', 'حتى') }}
+      <select name="asof" data-auto><option value="">{{ pick('Today', 'اليوم') }}</option>
+        {% for m in months|reverse %}<option value="{{ m }}" {{ 'selected' if asof_arg == m }}>{{ pick('End of', 'نهاية') }} {{ m }}</option>{% endfor %}</select></label>
+    <label>TPA<select name="tpa" data-auto><option value="">{{ t('all_tpas') }}</option>
+      {% for x in tpas %}<option value="{{ x }}" {{ 'selected' if f.tpa == x }}>{{ x }}</option>{% endfor %}</select></label>
+    <label>{{ pick('Target', 'الجهة') }}<select name="target" data-auto><option value="">{{ pick('TPAs and providers', 'الشركات ومقدمو الخدمة') }}</option>
+      <option value="TPA" {{ 'selected' if f.target == 'TPA' }}>{{ pick('TPAs', 'شركات إدارة المطالبات') }}</option>
+      <option value="Provider" {{ 'selected' if f.target == 'Provider' }}>{{ pick('Providers', 'مقدمو الخدمة') }}</option></select></label>
+    <label>{{ pick('Action type', 'نوع الإجراء') }}<select name="type" data-auto><option value="">{{ pick('All types', 'كل الأنواع') }}</option>
+      {% for x in types %}<option value="{{ x }}" {{ 'selected' if f.atype == x }}>{{ gl(x) }}</option>{% endfor %}</select></label>
+    <input type="hidden" name="status" value="{{ f.st }}">
+    <noscript><button class="btn">{{ t('apply') }}</button></noscript>
+  </form>
+</div>
+
+{% if meta.stale %}<div class="flash error">{{ pick('The register was last uploaded ' ~ meta.age_days ~ ' days ago. Statuses may be out of date: update the register and upload it.',
+  'آخر تحميل للسجل قبل ' ~ meta.age_days ~ ' يوما. قد لا تكون الحالات محدثة: حدّث السجل وحمّله.') }}</div>{% endif %}
+
+{% if not has %}
+  <div class="card"><p>{{ pick('Upload the governance & corrective-action register (F6) to see the tracker.', 'حمّل سجل الحوكمة والإجراءات التصحيحية (F6) لعرض المتابعة.') }}</p></div>
+{% else %}
+<div class="statusstrip">
+  <a class="schip t-slate {{ 'on' if not f.st }}" href="?{{ qs(status='') }}"><b>{{ counts.values()|sum }}</b>{{ pick('All', 'الكل') }}</a>
+  <a class="schip t-blue {{ 'on' if f.st == 'open' }}" href="?{{ qs(status='open') }}"><b>{{ counts.overdue + counts.due_soon + counts.on_track }}</b>{{ pick('Open', 'مفتوح') }}</a>
+  {% for k, v in STATUS.items() %}
+  <a class="schip t-{{ v[2] }} {{ 'on' if f.st == k }}" href="?{{ qs(status=k) }}"><b>{{ counts[k] }}</b>{{ label(k) }}</a>
+  {% endfor %}
+</div>
+<div class="toolbar noprint">
+  <a class="btn primary" href="{{ url_for('action_tracker_xlsx') }}?{{ qs() }}">{{ pick('Download Excel', 'تنزيل Excel') }}</a>
+  <button class="btn" type="button" data-print>{{ pick('Print or save as PDF', 'طباعة أو حفظ PDF') }}</button>
+  <span class="small muted">{{ pick('Open actions by age:', 'الإجراءات المفتوحة حسب العمر:') }}
+    {% for k, v in ages.items() %}<span class="agechip">{{ k }} {{ pick('days', 'يوم') }}: <b>{{ v }}</b></span>{% endfor %}</span>
+</div>
+<div class="card wide trackercard">
+  {% if rows %}
+  <div class="tablewrap"><table class="t tracker">
+    <thead><tr>
+      <th>{{ pick('Status', 'الحالة') }}</th><th>{{ pick('Action', 'الإجراء') }}</th><th>{{ pick('Target', 'الجهة') }}</th>
+      <th>{{ pick('Action type', 'نوع الإجراء') }}</th><th>{{ pick('Decision', 'القرار') }}</th><th>{{ pick('Due', 'الاستحقاق') }}</th>
+      <th>{{ pick('Owner', 'المسؤول') }}</th><th>{{ pick('Recovery', 'الاسترداد') }}</th><th>{{ pick('Status note', 'ملاحظة الحالة') }}</th>
+    </tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><span class="stat t-{{ STATUS[r.st][2] }}">{{ label(r.st) }}</span>
+          {% if r.changed == 'new' %}<div class="chg">{{ pick('New since last upload', 'جديد منذ آخر تحميل') }}</div>
+          {% elif r.changed %}<div class="chg">{{ pick('was', 'كان') }} {{ label(r.changed) }}</div>{% endif %}</td>
+        <td><a href="{{ url_for('action_detail', aid=r.id) }}{{ '?asof=' ~ asof_arg if asof_arg }}" dir="ltr">{{ r.id }}</a>
+          {% if r.code %}<div class="small muted" dir="ltr">{{ r.code }}</div>{% endif %}
+          {% if clips.get(r.id) %}<div><a class="clip" href="{{ url_for('documents', kind='action', ref=r.id) }}">📎 {{ clips[r.id] }}</a></div>{% endif %}</td>
+        <td>{{ tname(r) }}<div class="small muted">{{ gl(r.target_type) }}{% if r.target_type == 'Provider' and r.tpa %} · {{ r.tpa }}{% endif %}</div></td>
+        <td>{{ gl(r.type) }}</td>
+        <td dir="ltr">{{ r.decision_id or '-' }}{% if r.decision.minutes %}<div class="small muted">{{ r.decision.minutes }}</div>{% endif %}</td>
+        <td><span dir="ltr">{{ r.due or '-' }}</span>
+          {% if r.days_over %}<div class="small bad">{{ r.days_over }} {{ pick('days overdue', 'يوم تأخير') }}</div>
+          {% elif r.days_to_due == 0 %}<div class="small muted">{{ pick('due today', 'يستحق اليوم') }}</div>
+          {% elif r.days_to_due is not none %}<div class="small muted">{{ pick('in', 'خلال') }} {{ r.days_to_due }} {{ pick('days', 'يوم') }}</div>
+          {% elif r.completed %}<div class="small muted">{{ pick('done', 'أنجز') }} <span dir="ltr">{{ r.completed }}</span></div>{% endif %}</td>
+        <td>{{ r.owner or '-' }}{% if r.updated %}<div class="small muted">{{ pick('updated', 'حدث') }} <span dir="ltr">{{ r.updated }}</span></div>{% endif %}</td>
+        <td>{% if r.agreed %}<span dir="ltr">{{ '{:,.0f}'.format(r.recovered or 0) }} / {{ '{:,.0f}'.format(r.agreed) }}</span>{% else %}-{% endif %}</td>
+        <td class="note">{{ r.note or '' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody></table></div>
+  {% else %}<p class="muted">{{ pick('No action matches these filters.', 'لا توجد إجراءات مطابقة.') }}</p>{% endif %}
+  <p class="small muted">{{ pick('Provider names follow decision D-23: named only for approved decisions; referrals for investigation are never named. Recovery is SAR recovered / agreed, on evidence.',
+     'أسماء مقدمي الخدمة وفق القرار D-23: تظهر للقرارات المعتمدة فقط، ولا تظهر الإحالات للتحقيق. الاسترداد: المسترد / المتفق عليه بالريال، بناء على دليل.') }}
+     {% if not prev %} {{ pick('Changes are shown once a second version of the register has been published.', 'تظهر التغيرات بعد نشر نسخة ثانية من السجل.') }}{% endif %}</p>
+</div>
+{% endif %}
+{% endblock %}

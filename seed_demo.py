@@ -8,6 +8,10 @@ DEMO_PASSWORD = "Demo@Insights2026"
 TPAS = ["GlobeMed Saudi", "NextCare"]
 PROVIDERS = [f"Demo Hospital {c}" for c in "ABCDEFGHIJKLMN"]
 CODES = [("ELG", 3), ("EMG", 8), ("TRG", 4), ("PRV", 2), ("BEN", 6), ("DOC", 5), ("DQ", 9), ("CLM", 2)]
+NOTES = {1: "Deductions confirmed on two payment orders; balance due next cycle", 2: "Rule change live; evidence letter awaited",
+         3: "Action plan received; second milestone late", 4: "Notice acknowledged by the TPA",
+         5: "Recovered in full through payment-order deduction", 7: "Referred; counts only on the dashboard",
+         8: "Contract review scheduled with CNHI Provider Relations"}
 TYPES = {"ELG": "Eligibility not confirmed", "EMG": "Emergency criteria not met", "TRG": "Triage level inconsistent",
          "PRV": "Provider channel mismatch", "BEN": "Benefit limit or duration exceeded", "DOC": "Documentation missing",
          "DQ": "Data inconsistent", "CLM": "Billed above authorised amount"}
@@ -185,7 +189,65 @@ def build(today=None):
         m = (m.replace(day=28) + dt.timedelta(days=5)).replace(day=1)
     contract = dict(start=start.isoformat(), months=24, physicians=3, finance=1, hours_per_day=8)
     f5 = dict(deliverables=deliv, meetings=meet, recommendations=recs, kt=kt, effort=effort, requests=reqs, contract=contract)
-    return {"F1": f1, "F2": f2, "F3": f3, "F4": f4, "F5": f5}
+    # ---- F6 governance & corrective-action register (provider names already filtered as the upload does)
+    def d(n):
+        x = start + dt.timedelta(days=n)
+        return x.isoformat() if x <= today else None
+    recs6 = [dict(id=f"R{i:02d}", title=f"Demo recommendation {i}", type=tp, document=doc, source_type=src, source="",
+                  root="TPA adjudication", stage=st, proposed=d(5 + 6 * i), approved=d(20 + 6 * i) if st in ("Approved", "Issued") else None,
+                  issued=d(45 + 6 * i) if st == "Issued" else None, owner="CNHI Claims")
+             for i, (tp, doc, src, st) in enumerate([
+                 ("Policy or manual change", "Claims Management Operational Manual", "GSS report", "Issued"),
+                 ("Policy or manual change", "Pre-authorization emergency criteria", "Daily review flag", "Approved"),
+                 ("Contract or pricing change", "TPA service-level agreement", "Daily review flag", "Under CNHI review"),
+                 ("Process improvement", "Hospital objection handling", "Hospital dispute", "Proposed"),
+                 ("System or control", "Duplicate-claim check", "Financial review", "Issued"),
+                 ("Policy or manual change", "Benefit table: length of stay", "Trend analysis", "Under CNHI review")], start=1)]
+    decs = [dict(id="D01", submitted=d(25), subject_type="TPA", subject="GlobeMed Saudi", topic="Recovery", source="EMG flags",
+                 value=420000.0, forum="Monthly management review", decision="Approved", decided=d(32), minutes="MMR-01"),
+            dict(id="D02", submitted=d(28), subject_type="TPA", subject="NextCare", topic="Corrective action plan", source="DOC flags",
+                 value=0.0, forum="Monthly management review", decision="Approved with changes", decided=d(34), minutes="MMR-01"),
+            dict(id="D03", submitted=d(30), subject_type="Provider", subject="Demo Hospital C", topic="Recovery", source="CLM flags",
+                 value=180000.0, forum="Executive committee", decision="Approved", decided=d(38), minutes="EXC-02"),
+            dict(id="D04", submitted=d(40), subject_type="Provider", subject="", topic="Investigation referral", source="EMG flags",
+                 value=650000.0, forum="Executive committee", decision="Approved", decided=d(52), minutes="EXC-03"),
+            dict(id="D05", submitted=d(60), subject_type="Policy", subject="R02", topic="Policy approval", source="",
+                 value=0.0, forum="Monthly management review", decision="Pending", decided=None, minutes=""),
+            dict(id="D06", submitted=d(70), subject_type="Provider", subject="", topic="Contract action", source="BEN flags",
+                 value=90000.0, forum="Monthly management review", decision="Pending", decided=None, minutes="")]
+    from insights import deid
+    from insights.parsers import norm
+    acts = []
+    for i, (dec, tt, tgt, typ, code, o, due, comp, ag, rc) in enumerate([
+            ("D01", "TPA", "GlobeMed Saudi", "Recover overpayment", "EMG", 35, 65, 60, 420000, 310000),
+            ("D01", "TPA", "GlobeMed Saudi", "Process or system fix", "EMG", 35, 55, 58, 0, 0),
+            ("D02", "TPA", "NextCare", "Corrective action plan", "DOC", 38, 68, None, 0, 0),
+            ("D02", "TPA", "NextCare", "Formal notice", "DOC", 38, 46, 44, 0, 0),
+            ("D03", "Provider", "Demo Hospital C", "Recover overpayment", "CLM", 40, 70, 66, 180000, 180000),
+            ("D03", "Provider", "Demo Hospital C", "Provider education", "CLM", 40, 60, 58, 0, 0),
+            ("D04", "Provider", "Demo Hospital F", "Referral for investigation", "EMG", 53, 120, None, 0, 0),
+            ("D06", "Provider", "Demo Hospital H", "Contract review", "BEN", 72, 90, None, 90000, 0)], start=1):
+        named = tt == "TPA" or (dec in ("D01", "D02", "D03") and typ != "Referral for investigation")
+        acts.append(dict(id=f"A{i:02d}", decision_id=dec, target_type=tt, target=tgt if named else "",
+                         tpa=tgt if tt == "TPA" else "", type=typ, code=f"{code}-01", source="",
+                         opened=d(o), due=d(due) or (start + dt.timedelta(days=due)).isoformat(), completed=d(comp) if comp else None,
+                         status="Completed" if comp and d(comp) else "Open", agreed=float(ag), recovered=float(rc),
+                         key="" if tt == "TPA" else deid.ref(norm(tgt)),
+                         evidence=(f"CNHI-L-{100 + i}" if comp and i != 2 else ""),
+                         owner={"TPA": f"{tgt} claims unit"}.get(tt, "CNHI Provider Relations"),
+                         updated=d(min(o + 20, (today - start).days)) or today.isoformat(),
+                         note=NOTES.get(i, "")))
+    # demo only: most completed actions reduce the matching findings afterwards, so GC-08 has something to show
+    done = [a for a in acts if a["completed"] and a["id"] != "A04"]
+    def after_action(f):
+        for a in done:
+            hit = f["code"] == a["code"] and (f["tpa"] == a["target"] if a["target_type"] == "TPA" else f["provider"] == "Demo Hospital C")
+            if hit and f["date"] > a["completed"]:
+                return True
+        return False
+    f1["flags"] = [f for f in f1["flags"] if not (after_action(f) and r.random() < 0.7)]
+    f6 = dict(recommendations=recs6, decisions=decs, actions=[a for a in acts if a["opened"]])
+    return {"F1": f1, "F2": f2, "F3": f3, "F4": f4, "F5": f5, "F6": f6}
 
 
 def seed():
@@ -193,12 +255,55 @@ def seed():
         for email, name, role in (("admin@demo.local", "Demo administrator", "admin"), ("kpmg@demo.local", "Demo KPMG viewer", "kpmg"),
                                   ("cfo@demo.local", "Demo CNHI CFO", "cnhi")):
             db.insert("users", email=email, name=name, role=role, pw_hash=auth.hash_pw(DEMO_PASSWORD), created_at=db.now())
-    for kind, data in build().items():
+    built = build()
+    # an earlier F6 version, published 10 days ago, so the tracker shows changes and history
+    import copy
+    older = copy.deepcopy(built["F6"])
+    ten = (dt.date.today() - dt.timedelta(days=10)).isoformat()
+    for a in older["actions"]:
+        if a["id"] in ("A01", "A05"):                     # completed since the earlier version
+            a["completed"], a["evidence"], a["status"], a["recovered"] = None, "", "Open", 0.0
+    older["actions"] = [a for a in older["actions"] if a["opened"] and a["opened"] <= ten]
+    uid = db.insert("uploads", kind="F6", filename="demo_F6_previous.xlsx", sha256="demo", size=0, label="", status="staged",
+                    summary=db.dumps({"Demo": "synthetic data (earlier version)"}), warnings="[]", created_by="seed_demo",
+                    created_at=db.now())
+    store.save(uid, older)
+    store.publish(uid, "seed_demo")
+    db.update("uploads", uid, published_at=ten + " 09:00:00")
+    for kind, data in built.items():
         uid = db.insert("uploads", kind=kind, filename=f"demo_{kind}.xlsx", sha256="demo", size=0, label="",
                         status="staged", summary=db.dumps({"Demo": "synthetic data"}), warnings="[]",
                         created_by="seed_demo", created_at=db.now())
         store.save(uid, data)
         store.publish(uid, "seed_demo")
+    seed_documents(built)
+
+
+def seed_documents(built):
+    """A few small demo documents (PDF and Word) linked to deliverables, decisions and actions."""
+    from insights import library, samplefiles
+    if db.val("SELECT COUNT(*) FROM documents", default=0):
+        return
+    deliv = built["F5"]["deliverables"]
+    last = next((x for x in reversed(deliv) if x["submitted"]), deliv[0]) if deliv else None
+    items = []
+    if last:
+        key = last.get("ref") or f"{last['type']} {last['period']}"
+        from insights.parsers import to_month
+        items.append(("Monthly review report " + last["period"] + ".pdf", "monthly", to_month(last["period"]), "shared",
+                      [("deliverable", key)], samplefiles.pdf([f"Monthly review report {last['period']}", "Demo content only."])))
+    items += [
+        ("MMR-01 management review minutes.docx", "minutes", "", "shared", [("decision", "D01"), ("decision", "D02")],
+         samplefiles.docx(["Monthly management review: minutes MMR-01 (demo)", "D01 recovery from GlobeMed Saudi: approved.",
+                           "D02 corrective action plan for NextCare: approved with changes."])),
+        ("CNHI-L-101 deduction confirmation.pdf", "evidence", "", "shared", [("action", "A01")],
+         samplefiles.pdf(["Deduction confirmation CNHI-L-101 (demo)", "Two payment orders reduced; balance due next cycle."])),
+        ("NextCare action plan - KPMG working note.docx", "other", "", "kpmg", [("action", "A03")],
+         samplefiles.docx(["KPMG working note (demo): NextCare action plan review", "Second milestone late; follow up at the weekly meeting."])),
+    ]
+    for name, cat, period, vis, links, raw in items:
+        library.save(raw, name, dict(title=name.rsplit(".", 1)[0], category=cat, period=period, visibility=vis, links=links),
+                     "seed_demo", confirm=True)
 
 
 if __name__ == "__main__":

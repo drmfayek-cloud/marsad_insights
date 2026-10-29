@@ -5,7 +5,8 @@ Kinds:
   F2 GSS Assurance Workbook
   F3 hospital disputes tracker
   F4 quarterly accounting report
-  F5 governance register
+  F5 project delivery register (deliverables, meetings, knowledge transfer, team effort, CNHI requests, contract)
+  F6 governance & corrective-action register (recommendations, CNHI decisions, corrective actions)
 """
 import gzip
 import json
@@ -18,14 +19,16 @@ KINDS = {
     "F2": "GSS Assurance Workbook",
     "F3": "Hospital disputes tracker",
     "F4": "Quarterly accounting report",
-    "F5": "Governance register",
+    "F5": "Project delivery register",
+    "F6": "Governance & corrective-action register",
 }
 KINDS_AR = {
     "F1": "سجل مرصد اليومي",
     "F2": "مصنف ضمان GSS",
     "F3": "سجل اعتراضات المستشفيات",
     "F4": "التقرير المحاسبي الربعي",
-    "F5": "سجل الحوكمة",
+    "F5": "سجل إنجاز المشروع",
+    "F6": "سجل الحوكمة والإجراءات التصحيحية",
 }
 DATA_DIR = None
 _cache = {}

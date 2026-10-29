@@ -6,3 +6,8 @@ __pycache__/
 # Never commit workbooks: they contain patient and case data.
 *.xlsm
 uploads/
+
+# Never commit documents from the library either.
+*.pdf
+*.docx
+*.doc

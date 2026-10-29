@@ -15,9 +15,19 @@
     <label>{{ pick('Quarter, accounting report only (e.g. 2026-Q1; read from the sheet names if blank)', 'الربع، للتقرير المحاسبي فقط') }}<input name="label" placeholder="2026-Q1" pattern="\d{4}-Q[1-4]"></label>
     <button class="btn primary">{{ pick('Upload and preview', 'تحميل ومعاينة') }}</button>
   </form>
-  <p class="small muted">{{ pick('Templates:', 'النماذج:') }} <a href="{{ url_for('governance_xlsx') }}">{{ pick('Governance register (F5)', 'سجل الحوكمة (F5)') }}</a> ·
+  <p class="small muted">{{ pick('Templates:', 'النماذج:') }} <a href="{{ url_for('governance_xlsx') }}">{{ pick('Project delivery register (F5)', 'سجل إنجاز المشروع (F5)') }}</a> ·
+    <a href="{{ url_for('corrective_xlsx') }}">{{ pick('Governance & corrective-action register (F6)', 'سجل الحوكمة والإجراءات التصحيحية (F6)') }}</a> ·
     <a href="{{ url_for('static', filename='downloads/CNHI_Hospital_Disputes_Tracker_v1.0.xlsx') }}">{{ pick('Hospital disputes tracker (F3)', 'سجل الاعتراضات (F3)') }}</a></p>
 </div>
+{% if cand %}
+<div class="card wide t-amber">
+  <h3>{{ pick('F6 candidates', 'المرشحات لسجل F6') }}</h3>
+  <p>{{ pick(cand.dec ~ ' decision candidates and ' ~ cand.act ~ ' action candidates from the published daily register, GSS workbook and disputes tracker; ' ~ cand.skipped ~ ' already in the register were left out.',
+             cand.dec ~ ' قرار مرشح و' ~ cand.act ~ ' إجراء مرشح من الملفات المنشورة؛ واستبعد ' ~ cand.skipped ~ ' موجودة في السجل.') }}</p>
+  <p><a class="btn primary" href="{{ url_for('candidates_xlsx') }}">{{ pick('Download F6 candidates (KPMG internal)', 'تنزيل المرشحات (داخلي لفريق KPMG)') }}</a>
+     <span class="small muted">{{ pick('Review the rows and copy the ones CNHI should consider into the F6 register. The file can contain provider names.', 'راجع الصفوف وانسخ المناسب منها إلى سجل F6. قد يحتوي الملف على أسماء مقدمي الخدمة.') }}</span></p>
+</div>
+{% endif %}
 <div class="card wide">
   <h3>{{ pick('Published versions', 'النسخ المنشورة') }}</h3>
   <table class="t"><thead><tr><th>{{ pick('Workbook', 'المصنف') }}</th><th>{{ pick('Version', 'النسخة') }}</th><th>{{ pick('File', 'الملف') }}</th><th>{{ pick('Published', 'تاريخ النشر') }}</th></tr></thead><tbody>

@@ -11,10 +11,10 @@ import tempfile
 
 from flask import (Flask, Response, abort, flash, g, redirect, render_template, request, session, url_for)
 
-from insights import auth, config, db, deid, kpi, store, theme
+from insights import actions, auth, candidates, library, config, db, deid, kpi, store, theme
 from insights.i18n import lang, pick, t
 from insights.parsers import ParseError, parse
-from insights.xlsx_templates import governance_template
+from insights.xlsx_templates import corrective_template, governance_template
 
 ALLOWED = {".xlsx", ".xlsm"}
 
@@ -43,6 +43,7 @@ def create_app():
     db.init(os.path.join(data_dir, "insights.db"))
     deid.init(data_dir)
     store.init(data_dir)
+    library.init(data_dir)
     bootstrap(app)
 
     app.jinja_env.globals.update(t=t, pick=pick, lang=lang, csrf_token=auth.csrf_token, ROLES=auth.ROLES, theme=theme,
@@ -209,6 +210,7 @@ def create_app():
             badge = "approved"
         else:
             ctx = kpi.Ctx(data, period, tpa, internal=g.user["role"] in auth.INTERNAL)
+            ctx.meta = {"F6": actions.meta()}
             results = kpi.compute_page(pg["code"], ctx)
             badge = "filtered" if (snap and tpa) else "provisional"
         trend, sparks = None, {}
@@ -222,6 +224,177 @@ def create_app():
         return render_template("page.html", pg=pg, defs=defs, results=results, months=ms, period=period, tpa=tpa,
                                tpas=tpa_list, badge=badge, snap=snap, trend=trend, sparks=sparks, has_data=bool(data),
                                as_of=data_as_of())
+
+    # ------------------------------------------------------------------ corrective-action tracker (all signed-in users)
+    def tracker_state():
+        """F6 dataset, as-at date and comparison base for the tracker. A closed month uses the register version that was
+        current when the month was closed, so its statuses are the month-end position."""
+        asof_arg = request.args.get("asof", "")
+        today = dt.date.today().isoformat()
+        cur_ids = store.current_ids()
+        uid, asof, frozen = cur_ids.get("F6"), today, False
+        if asof_arg and len(asof_arg) == 7 and asof_arg[4] == "-" and asof_arg[:4].isdigit():
+            y, m = int(asof_arg[:4]), int(asof_arg[5:7])
+            end = dt.date(y, m, 28) + dt.timedelta(days=4)
+            asof = min((end - dt.timedelta(days=end.day)).isoformat(), today)
+            snap = db.q1("SELECT * FROM snapshots WHERE month=?", (asof_arg,))
+            ids = db.loads(snap["datasets"], {}) if snap else {}
+            if ids.get("F6"):
+                uid, frozen = int(ids["F6"]), True
+        f6 = store.load(uid) if uid else None
+        prev = actions.previous_statuses(uid) if (uid and not frozen) else None
+        return f6, asof, asof_arg, frozen, prev
+
+    def tracker_filters():
+        return dict(tpa=request.args.get("tpa", ""), target=request.args.get("target", ""), st=request.args.get("status", ""),
+                    atype=request.args.get("type", ""))
+
+    @app.route("/p/governance/actions")
+    @auth.login_required
+    def action_tracker():
+        f6, asof, asof_arg, frozen, prev = tracker_state()
+        f = tracker_filters()
+        allrows = actions.rows(f6, asof, tpa=f["tpa"], target=f["target"], atype=f["atype"], prev=prev) if f6 else []
+        counts, ages = actions.summary(allrows)
+        rs = [r for r in allrows if not f["st"] or (r["st"] in actions.OPEN if f["st"] == "open" else r["st"] == f["st"])]
+        months = [m for m in kpi.months(store.current()) if m]
+        base = dict(asof=asof_arg, tpa=f["tpa"], target=f["target"], status=f["st"], type=f["atype"])
+
+        def qs(**kw):
+            from urllib.parse import urlencode
+            return urlencode({k: v for k, v in dict(base, **kw).items() if v})
+        clips = library.counts_for("action", g.user["role"] in auth.INTERNAL)
+        return render_template("actions.html", qs=qs, clips=clips, rows=rs, counts=counts, ages=ages, asof=asof, asof_arg=asof_arg, frozen=frozen,
+                               f=f, meta=actions.meta(), months=months, has=bool(f6), prev=prev is not None,
+                               tpas=sorted({a["tpa"] for a in (f6 or {}).get("actions", []) if a["tpa"]}),
+                               types=sorted({a["type"] for a in (f6 or {}).get("actions", []) if a["type"]}),
+                               STATUS=actions.STATUS, label=actions.label, tname=actions.target_name, gl=kpi.gl, pg=config.PAGE_BY_SLUG["governance"])
+
+    @app.route("/p/governance/actions/<aid>")
+    @auth.login_required
+    def action_detail(aid):
+        f6, asof, asof_arg, frozen, prev = tracker_state()
+        r = next((x for x in actions.rows(f6, asof, prev=prev) if x["id"] == aid), None) if f6 else None
+        if r is None:
+            abort(404)
+        recs = {x["id"]: x for x in f6["recommendations"]}
+        ins = g.user["role"] in auth.INTERNAL
+        docs = [dict(x, via="action") for x in library.for_link("action", aid, ins)]
+        if r["decision_id"]:
+            docs += [dict(x, via="decision") for x in library.for_link("decision", r["decision_id"], ins)]
+        return render_template("action.html", docs=docs, can_upload=ins, CATS=library.CATEGORIES, r=r, asof=asof, asof_arg=asof_arg, hist=actions.history().get(aid, []),
+                               rec=recs.get(r["decision"].get("subject", "")), STATUS=actions.STATUS, label=actions.label,
+                               tname=actions.target_name, gl=kpi.gl, pg=config.PAGE_BY_SLUG["governance"])
+
+    @app.route("/p/governance/actions.xlsx")
+    @auth.login_required
+    def action_tracker_xlsx():
+        f6, asof, asof_arg, frozen, prev = tracker_state()
+        if not f6:
+            abort(404)
+        f = tracker_filters()
+        rs = actions.rows(f6, asof, prev=prev, **f)
+        desc = ", ".join(f"{k}={v}" for k, v in f.items() if v)
+        meta = actions.meta()
+        body = actions.to_xlsx(rs, asof, desc, meta.get("published", "-"), g.user["email"])
+        auth.audit("download_actions", f"as at {asof}; {len(rs)} rows; {desc or 'no filter'}")
+        return Response(body, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers={"Content-Disposition": f"attachment; filename=Corrective_action_tracker_{asof}.xlsx"})
+
+    # ------------------------------------------------------------------ documents library (1.7)
+    def internal():
+        return g.user["role"] in auth.INTERNAL
+
+    def doc_form_meta(form):
+        links = [(k, ref) for k in library.LINK_KINDS for ref in form.getlist(f"link_{k}") if ref]
+        return dict(title=form.get("title", ""), category=form.get("category", ""), period=form.get("period", ""),
+                    description=form.get("description", ""), visibility=form.get("visibility", ""), links=links)
+
+    def link_labels(data):
+        return {k: dict(v) for k, v in library.link_options(data).items()}
+
+    @app.route("/documents")
+    @auth.login_required
+    def documents():
+        a = request.args
+        docs = library.search(internal(), q=a.get("q", ""), category=a.get("category", ""), kind=a.get("kind", ""),
+                              ref=a.get("ref", ""), period=a.get("period", ""))
+        lk = {d["id"]: library.links(d["id"]) for d in docs}
+        return render_template("documents.html", docs=docs, links=lk, labels=link_labels(store.current()), args=a,
+                               CATS=library.CATEGORIES, KINDS=library.LINK_KINDS, can_upload=internal())
+
+    @app.route("/documents/upload", methods=["GET", "POST"])
+    @auth.roles_required("admin", "kpmg")
+    def document_upload():
+        parent = db.q1("SELECT * FROM documents WHERE id=? AND status='active'", (request.values.get("parent", type=int),)) \
+            if request.values.get("parent") else None
+        form = request.form if request.method == "POST" else None
+        if request.method == "POST":
+            f = request.files.get("file")
+            meta = doc_form_meta(request.form)
+            try:
+                raw = f.read() if f else b""
+                doc_id, check, n = library.save(raw, f.filename if f else "", meta, g.user["email"],
+                                                confirm=request.form.get("confirm") == "1",
+                                                parent=parent["id"] if parent else None)
+            except library.LibraryError as e:
+                auth.audit("document_rejected", f"{f.filename if f else '-'}: {e}")
+                flash(str(e), "error")
+            else:
+                detail = f"#{doc_id} {meta['category']} {meta['visibility']} {f.filename}"
+                if check != "clean":
+                    detail += f" - uploader confirmed no patient identifiers ({check}, {n} matches)"
+                auth.audit("document_new_version" if parent else "document_uploaded", detail)
+                flash(pick("Document saved.", "تم حفظ المستند."), "ok")
+                return redirect(url_for("document_view", doc_id=doc_id))
+        pre = dict(parent) if parent else {}
+        if parent:
+            pre["links"] = library.links(parent["id"])
+        elif request.args.get("kind") and request.args.get("ref"):
+            pre["links"] = [(request.args["kind"], request.args["ref"])]
+            pre["category"] = request.args.get("category", "")
+        return render_template("document_upload.html", form=form, pre=pre, parent=parent, CATS=library.CATEGORIES,
+                               KINDS=library.LINK_KINDS, options=library.link_options(store.current()))
+
+    @app.route("/documents/<int:doc_id>", methods=["GET", "POST"])
+    @auth.login_required
+    def document_view(doc_id):
+        d = library.get(doc_id, internal())
+        if d is None:
+            abort(404)
+        if request.method == "POST":
+            act = request.form.get("act")
+            if act == "edit" and internal():
+                meta = doc_form_meta(request.form)
+                if meta["visibility"] in ("kpmg", "shared") and meta["category"] in library.CATEGORIES:
+                    db.update("documents", doc_id, title=meta["title"].strip()[:200] or d["title"], category=meta["category"],
+                              period=meta["period"][:7], description=meta["description"].strip()[:500], visibility=meta["visibility"])
+                    library.set_links(doc_id, meta["links"])
+                    auth.audit("document_edited", f"#{doc_id} visibility={meta['visibility']} links={len(meta['links'])}")
+                    flash(pick("Changes saved.", "تم حفظ التغييرات."), "ok")
+            elif act == "delete" and g.user["role"] == "admin":
+                library.delete(d)
+                auth.audit("document_deleted", f"#{doc_id} {d['filename']} and its earlier versions")
+                flash(pick("Document deleted.", "تم حذف المستند."), "ok")
+                return redirect(url_for("documents"))
+            return redirect(url_for("document_view", doc_id=doc_id))
+        vs = [v for v in library.versions(d) if v["status"] != "deleted" and (internal() or v["visibility"] == "shared")]
+        return render_template("document.html", d=d, links=library.links(doc_id), labels=link_labels(store.current()), versions=vs,
+                               CATS=library.CATEGORIES, KINDS=library.LINK_KINDS, can_edit=internal(),
+                               options=library.link_options(store.current()))
+
+    @app.route("/documents/<int:doc_id>/download")
+    @auth.login_required
+    def document_download(doc_id):
+        d = library.get(doc_id, internal())
+        if d is None or not os.path.exists(library.path(d)):
+            abort(404)
+        auth.audit("document_downloaded", f"#{doc_id} {d['filename']}")
+        from flask import send_file
+        resp = send_file(library.path(d), mimetype=library.EXT[d["ext"]], as_attachment=True, download_name=d["filename"],
+                         max_age=0)
+        resp.headers["Cache-Control"] = "private, no-store"
+        return resp
 
     # ------------------------------------------------------------------ data uploads (admin)
     @app.route("/data", methods=["GET", "POST"])
@@ -263,7 +436,12 @@ def create_app():
             return redirect(url_for("data_view", uid=uid))
         ups = db.q("SELECT * FROM uploads WHERE status<>'discarded' ORDER BY id DESC LIMIT 60")
         cur = {k: db.q1("SELECT * FROM uploads WHERE id=?", (uid,)) for k, uid in store.current_ids().items()}
-        return render_template("data.html", uploads=ups, current=cur)
+        try:
+            cd, ca, cs = candidates.build(store.current())
+            cand = dict(dec=len(cd), act=len(ca), skipped=cs)
+        except Exception:  # noqa: BLE001 - the upload page must open even if a dataset is incomplete
+            cand = None
+        return render_template("data.html", uploads=ups, current=cur, cand=cand)
 
     @app.route("/data/<int:uid>", methods=["GET", "POST"])
     @auth.roles_required("admin")
@@ -288,7 +466,21 @@ def create_app():
     @auth.roles_required("admin")
     def governance_xlsx():
         return Response(governance_template(), mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        headers={"Content-Disposition": "attachment; filename=MARSAD_Governance_Register_template.xlsx"})
+                        headers={"Content-Disposition": "attachment; filename=MARSAD_Project_Delivery_Register_template.xlsx"})
+
+    @app.route("/data/candidates.xlsx")
+    @auth.roles_required("admin")
+    def candidates_xlsx():
+        body, nd, na, skipped = candidates.to_xlsx(store.current())
+        auth.audit("download_candidates", f"{nd} decision and {na} action candidates; {skipped} already in F6")
+        return Response(body, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers={"Content-Disposition": f"attachment; filename=F6_candidates_{dt.date.today()}.xlsx"})
+
+    @app.route("/data/template/corrective-actions.xlsx")
+    @auth.roles_required("admin")
+    def corrective_xlsx():
+        return Response(corrective_template(), mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers={"Content-Disposition": "attachment; filename=MARSAD_Governance_Corrective_Actions_Register_template.xlsx"})
 
     # ------------------------------------------------------------------ period close (admin)
     @app.route("/periods", methods=["GET", "POST"])
@@ -303,6 +495,7 @@ def create_app():
                 for lg in ("en", "ar"):
                     g.lang = lg
                     ctx = kpi.Ctx(data, month, "", internal=False)
+                    ctx.meta = {"F6": actions.meta()}
                     res = {}
                     for p in config.PAGES:
                         res.update(kpi.compute_page(p["code"], ctx))

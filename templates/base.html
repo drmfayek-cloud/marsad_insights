@@ -18,6 +18,7 @@
     </a>
     <div class="tools">
       <a class="langbtn" href="{{ url_for('set_lang', code='ar' if lang() == 'en' else 'en') }}">{{ t('lang_switch') }}</a>
+      <a class="hdrbtn{{ ' on' if request.path.startswith('/documents') }}" href="{{ url_for('documents') }}">{{ theme.icon('doc', 18) }}<span>{{ pick('Documents', 'المستندات') }}</span></a>
       {% if g.user.role == 'admin' %}
       <details class="menu-pop">
         <summary>{{ theme.icon('layers', 18) }}<span>{{ pick('Admin', 'الإدارة') }}</span></summary>
@@ -42,7 +43,7 @@
   <nav class="pills" aria-label="{{ pick('Pages', 'الصفحات') }}">
     {% for p in PAGES %}
     <a href="{{ url_for('page', slug=p.slug, period=request.args.get('period'), tpa=request.args.get('tpa')) }}"
-       class="{{ 'on' if request.path == url_for('page', slug=p.slug) }}">{{ pick(p.en, p.ar) }}</a>
+       class="{{ 'on' if request.path == url_for('page', slug=p.slug) or request.path.startswith(url_for('page', slug=p.slug) + '/') }}">{{ pick(p.en, p.ar) }}</a>
     {% endfor %}
   </nav>
 </header>

@@ -1,6 +1,6 @@
-"""SQLite storage for users, audit, uploads, settings and approved period snapshots.
+"""SQLite storage for users, audit, uploads, settings, approved period snapshots and the documents library index.
 
-Uploaded workbooks are never stored. Each upload is parsed into a de-identified dataset (gzip JSON on disk);
+Uploaded register workbooks are never stored (documents deliberately added to the library are, see insights/library.py). Each upload is parsed into a de-identified dataset (gzip JSON on disk);
 this database only records who uploaded what, when, and which version is published.
 Change the schema by appending to MIGRATIONS, never by editing an earlier entry.
 """
@@ -38,6 +38,17 @@ MIGRATIONS = [
         created_by TEXT, created_at TEXT);
 
     CREATE TABLE pseudonyms (hash TEXT PRIMARY KEY, label TEXT NOT NULL, kind TEXT DEFAULT 'person');
+    """,
+    # v2 (1.7): documents library. Files are kept on disk under <data>/library; this records who, what and who may see it.
+    """
+    CREATE TABLE documents (
+        id INTEGER PRIMARY KEY, title TEXT NOT NULL, category TEXT NOT NULL, period TEXT DEFAULT '', description TEXT DEFAULT '',
+        visibility TEXT NOT NULL CHECK (visibility IN ('kpmg','shared')), filename TEXT NOT NULL, ext TEXT NOT NULL,
+        size INTEGER, sha256 TEXT, text TEXT DEFAULT '', id_check TEXT DEFAULT '', id_count INTEGER DEFAULT 0,
+        parent_id INTEGER DEFAULT NULL, status TEXT DEFAULT 'active', uploaded_by TEXT, uploaded_at TEXT);
+    CREATE INDEX ix_documents_status ON documents(status, category);
+    CREATE TABLE doc_links (doc_id INTEGER NOT NULL, kind TEXT NOT NULL, ref TEXT NOT NULL, PRIMARY KEY (doc_id, kind, ref));
+    CREATE INDEX ix_doc_links_ref ON doc_links(kind, ref);
     """,
 ]
 

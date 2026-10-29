@@ -1,4 +1,5 @@
-"""The 64 KPIs (55 in dictionary v0.3, plus OP-01 to OP-09 for KPMG delivery and effort). Each function takes the context and returns a result dict.
+"""The 74 KPIs of dictionary v0.6 (v0.3, plus OP-01 to OP-09 for KPMG delivery and effort, plus EX-11 and GC-01 to
+GC-09 for governance and corrective actions). Each function takes the context and returns a result dict.
 
 Rules applied throughout (see the Decisions sheet of the KPI dictionary):
   D-01 activity is dated by when the work happened (intake date, date logged, report issued, closure date);
@@ -13,7 +14,7 @@ from collections import Counter, defaultdict
 
 from markupsafe import Markup
 
-from . import charts, config
+from . import actions, charts, config
 from .i18n import lang, pick, t
 
 
@@ -25,6 +26,7 @@ class Ctx:
         self.tpa = tpa
         self.internal = internal
         self.today = today or dt.date.today().isoformat()
+        self.meta = {}           # set by the app: {"F6": {"published", "age_days", "stale"}}
         if period == "all":
             self.start, self.end = "0000-00-00", self.today
         else:
@@ -106,7 +108,8 @@ MISSING = {
     "F2": "Upload the GSS Assurance Workbook.",
     "F3": "Upload the hospital disputes tracker.",
     "F4": "Upload the quarterly accounting report.",
-    "F5": "Upload the governance register.",
+    "F5": "Upload the project delivery register.",
+    "F6": "Upload the governance & corrective-action register.",
 }
 
 
@@ -798,9 +801,10 @@ def fw07(c):
 
 
 def fw08(c):
-    if not c.get("F5"):
-        return nodata(MISSING["F5"])
-    rs = [r for r in c.get("F5")["recommendations"] if c.upto(r["raised"]) or not r["raised"]]
+    allr = recommendations(c)
+    if allr is None:
+        return nodata(MISSING["F6"])
+    rs = [r for r in allr if c.upto(r["raised"]) or not r["raised"]]
     acc = sum(1 for r in rs if r["status"] in ("Accepted", "Implemented"))
     imp = sum(1 for r in rs if r["status"] == "Implemented")
     return R(num(len(rs)), pick(f"{acc} accepted · {imp} implemented", f"{acc} معتمدة · {imp} منفذة"), raw=len(rs))
@@ -1007,8 +1011,8 @@ def _value(c):
         closed = [d for d in disputes(c) if c.inp(d["closed"])]
         known = any(d["value"] is not None or d["maintained"] is not None for d in closed)
         v["kept"] = sum(_kept(d) for d in closed) if known else None
-    if c.get("F5"):
-        v["recs"] = sum(1 for r in c.get("F5")["recommendations"]
+    if recommendations(c) is not None:
+        v["recs"] = sum(1 for r in recommendations(c)
                         if r["status"] in ("Accepted", "Implemented") and (c.inp(r["accepted"]) or (not r["accepted"] and c.inp(r["raised"]))))
     return v
 
@@ -1199,6 +1203,315 @@ def op09(c):
                           pick("Per person-day", "لكل يوم عمل")], tab), raw=head)
 
 
+# ------------------------------------------------------------------ Governance and corrective actions (GC, F6)
+GC_AR = {  # fixed drop-down values of the F6 register, shown in Arabic on the Arabic view
+    "Proposed": "مقترحة", "Under CNHI review": "قيد مراجعة المركز", "Approved": "معتمدة", "Issued": "صادرة",
+    "Rejected": "مرفوضة", "Withdrawn": "مسحوبة",
+    "Policy or manual change": "تغيير سياسة أو دليل", "Process improvement": "تحسين إجراء",
+    "Contract or pricing change": "تغيير عقد أو تسعير", "System or control": "نظام أو ضابط رقابي",
+    "Approved with changes": "معتمد مع تعديلات", "Deferred": "مؤجل", "Pending": "معلق",
+    "Recovery": "استرداد", "Corrective action plan": "خطة تصحيحية", "Contract action": "إجراء تعاقدي",
+    "Investigation referral": "إحالة للتحقيق", "Policy approval": "اعتماد سياسة", "Other": "أخرى",
+    "Reprocess claims": "إعادة معالجة المطالبات", "Recover overpayment": "استرداد مبالغ زائدة", "Formal notice": "إنذار رسمي",
+    "Service-level penalty": "غرامة مستوى الخدمة", "Process or system fix": "إصلاح إجراء أو نظام",
+    "Provider education": "توعية مقدم الخدمة", "Pre-authorization restriction": "تقييد الموافقات المسبقة",
+    "Contract review": "مراجعة العقد", "Referral for investigation": "إحالة للتحقيق",
+    "TPA": "شركة إدارة مطالبات", "Provider": "مقدم خدمة",
+}
+
+
+DEC_AR = {"Approved": "اعتماد", "Approved with changes": "اعتماد مع تعديلات", "Rejected": "رفض", "Deferred": "تأجيل",
+          "Pending": "معلق"}   # decision outcomes (a decision is masculine in Arabic; stages above describe recommendations)
+
+
+def gl(x, decision=False):
+    """Label of a fixed F6 value in the page language."""
+    if lang() != "ar":
+        return x
+    return (DEC_AR if decision else GC_AR).get(x, GC_AR.get(x, x))
+
+
+def f6(c):
+    return c.get("F6")
+
+
+def ref_end(c):
+    return min(c.end, c.today)
+
+
+def recommendations(c):
+    """F6 recommendations (stage-based), or the older F5 Recommendations sheet."""
+    if f6(c):
+        return [dict(raised=r["proposed"], accepted=r["approved"], implemented=r["issued"],
+                     status="Implemented" if r["stage"] == "Issued" else "Accepted" if r["stage"] == "Approved" else r["stage"])
+                for r in f6(c)["recommendations"]]
+    if c.get("F5"):
+        return c.get("F5").get("recommendations") or []
+    return None
+
+
+def gc_actions(c, target=None):
+    out = []
+    for a in f6(c)["actions"]:
+        if target and a["target_type"] != target:
+            continue
+        if c.tpa and a["tpa"] != c.tpa:
+            continue
+        if (a["status"] or "").lower() == "cancelled":
+            continue
+        out.append(a)
+    return out
+
+
+def is_open(a, end):
+    return actions.status(a, end) in actions.OPEN          # one status rule for tiles, tracker and download
+
+
+def is_overdue(a, end):
+    return actions.status(a, end) == "overdue"
+
+
+def stale_note(c):
+    m = (c.meta or {}).get("F6") or {}
+    if m.get("stale"):
+        return pick(f"The register was last uploaded {m['age_days']} days ago ({m['published'][:10]}): statuses may be out of date.",
+                    f"آخر تحميل للسجل قبل {m['age_days']} يوما ({m['published'][:10]}): قد لا تكون الحالات محدثة.")
+    return ""
+
+
+def gc09(c):
+    asof = ref_end(c)
+    rs = actions.rows(f6(c), asof, tpa=c.tpa)
+    counts, ages = actions.summary(rs)
+    n_open = sum(counts[k] for k in actions.OPEN)
+    sub = pick(f"overdue · {n_open} open · {counts['due_soon']} due soon · {counts['done_pending']} completed, evidence pending · as at {asof}",
+               f"متأخر · {n_open} مفتوح · {counts['due_soon']} يستحق قريبا · {counts['done_pending']} منجز بانتظار الدليل · حتى {asof}")
+    res = R(num(counts["overdue"]), sub,
+            chart=charts.hbar([(actions.label(k), counts[k]) for k in actions.STATUS if counts[k]], rtl=lang() == "ar"),
+            table=table([pick("Open actions by age (days since opened)", "الإجراءات المفتوحة حسب العمر (أيام منذ الفتح)"), t("count")],
+                        [[k, num(v)] for k, v in ages.items()]), raw=counts["overdue"])
+    if stale_note(c):
+        res["state"], res["note"] = "partial", stale_note(c)
+    return res
+
+
+def gc01(c):
+    rs = [r for r in f6(c)["recommendations"] if c.upto(r["proposed"]) or not r["proposed"]]
+    if not rs:
+        return R("0", pick("No recommendation recorded yet", "لم تسجل توصيات بعد"), raw=0)
+    order = ["Proposed", "Under CNHI review", "Approved", "Issued", "Rejected", "Withdrawn"]
+    by = Counter(r["stage"] or "Proposed" for r in rs)
+    issued_p = sum(1 for r in rs if c.inp(r["issued"]))
+    typ = defaultdict(lambda: [0, 0, 0])
+    for r in rs:
+        k = r["type"] or "-"
+        typ[k][0] += 1
+        typ[k][1] += 1 if r["stage"] in ("Approved", "Issued") else 0
+        typ[k][2] += 1 if r["stage"] == "Issued" else 0
+    return R(num(len(rs)), pick(f"recommendations · {by['Approved'] + by['Issued']} approved · {by['Issued']} issued ({issued_p} in this period)",
+                                f"توصية · {by['Approved'] + by['Issued']} معتمدة · {by['Issued']} صادرة ({issued_p} في هذه الفترة)"),
+             chart=charts.hbar([(gl(k), by[k]) for k in order if by.get(k)], rtl=lang() == "ar"),
+             table=table([pick("Type", "النوع"), t("count"), pick("Approved", "معتمدة"), pick("Issued", "صادرة")],
+                         [[gl(k), num(a), num(b), num(d)] for k, (a, b, d) in sorted(typ.items(), key=lambda x: -x[1][0])]),
+             raw=len(rs))
+
+
+def gc02(c):
+    rs = f6(c)["recommendations"]
+    a = [days(r["proposed"], r["approved"]) for r in rs if c.inp(r["approved"]) and r["proposed"]]
+    b = [days(r["approved"], r["issued"]) for r in rs if c.inp(r["issued"]) and r["approved"]]
+    waiting = [days(r["proposed"], ref_end(c)) for r in rs if r["stage"] in ("Proposed", "Under CNHI review")
+               and r["proposed"] and r["proposed"] <= ref_end(c)]
+    ma, mb = median(a), median(b)
+    tab = table([pick("Step", "المرحلة"), pick("Median days", "الوسيط بالأيام"), t("count")],
+                [[pick("Proposed to approved by CNHI", "من الاقتراح إلى اعتماد المركز"), num(ma) if ma is not None else "-", num(len(a))],
+                 [pick("Approved to issued or effective", "من الاعتماد إلى الإصدار أو السريان"), num(mb) if mb is not None else "-", num(len(b))],
+                 [pick("Awaiting CNHI decision (age so far)", "بانتظار قرار المركز (العمر حتى الآن)"),
+                  num(median(waiting)) if waiting else "-", num(len(waiting))]])
+    return R(num(ma) if ma is not None else "-", pick(f"days from proposal to CNHI approval, median of {len(a)}",
+                                                     f"يوم من الاقتراح إلى اعتماد المركز، الوسيط من {len(a)}"), table=tab, raw=ma)
+
+
+def gc03(c):
+    ds = f6(c)["decisions"]
+    sub_ = [d for d in ds if c.inp(d["submitted"])]
+    dec = [d for d in ds if c.inp(d["decided"]) and d["decision"] != "Pending"]
+    pend = [d for d in ds if c.upto(d["submitted"]) and not (d["decided"] and d["decided"] <= c.end and d["decision"] != "Pending")]
+    tat = median([days(d["submitted"], d["decided"]) for d in dec if d["submitted"]])
+    by = Counter(d["decision"] for d in dec)
+    top = defaultdict(lambda: [0, 0.0])
+    for d in dec:
+        top[d["topic"] or "-"][0] += 1
+        top[d["topic"] or "-"][1] += d["value"] or 0
+    sub = pick(f"decided · {len(sub_)} submitted · {len(pend)} pending at period end", f"قرار · {len(sub_)} مقدمة · {len(pend)} معلقة بنهاية الفترة")
+    if tat is not None:
+        sub += pick(f" · median {num(tat)} days to decision", f" · الوسيط {num(tat)} يوم حتى القرار")
+    return R(num(len(dec)), sub, chart=charts.donut([(gl(k, decision=True), v) for k, v in by.items()]) if dec else None,
+             table=table([pick("Topic", "الموضوع"), pick("Decided", "تم البت"), pick("Value at stake", "القيمة محل القرار")],
+                         [[gl(k), num(a), sar(b)] for k, (a, b) in sorted(top.items(), key=lambda x: -x[1][0])]) if dec else None,
+             raw=len(dec))
+
+
+def gc04(c):
+    acts, end = gc_actions(c, "TPA"), ref_end(c)
+    if not acts:
+        return R("0", pick("No corrective action on TPAs recorded", "لا توجد إجراءات تصحيحية على شركات إدارة المطالبات"), raw=0)
+    op = [a for a in acts if is_open(a, end)]
+    od = [a for a in acts if is_overdue(a, end)]
+    opened = sum(1 for a in acts if c.inp(a["opened"]))
+    done = sum(1 for a in acts if c.inp(a["completed"]))
+    by = defaultdict(lambda: [0, 0, 0, 0.0])
+    for a in acts:
+        k = a["target"] or "-"
+        by[k][0] += 1 if is_open(a, end) else 0
+        by[k][1] += 1 if is_overdue(a, end) else 0
+        by[k][2] += 1 if c.inp(a["completed"]) else 0
+        by[k][3] += (a["agreed"] or 0) if c.upto(a["opened"]) else 0
+    return R(num(len(op)), pick(f"open · {len(od)} overdue · {opened} opened and {done} completed in the period",
+                                f"مفتوح · {len(od)} متأخر · {opened} فتح و{done} أنجز في الفترة"),
+             table=table(["TPA", pick("Open", "مفتوح"), pick("Overdue", "متأخر"), pick("Completed in period", "أنجز في الفترة"),
+                          pick("Recovery agreed", "الاسترداد المتفق عليه")],
+                         [[k, num(a), num(b), num(d), sar(v)] for k, (a, b, d, v) in sorted(by.items(), key=lambda x: (-x[1][1], -x[1][0]))]),
+             raw=len(op))
+
+
+def gc05(c):
+    acts = [a for a in gc_actions(c, "TPA") if c.inp(a["completed"]) and a["due"]]
+    end = ref_end(c)
+    od = sum(1 for a in gc_actions(c, "TPA") if is_overdue(a, end))
+    if not acts:
+        return R("-", pick(f"No TPA action completed in this period · {od} overdue", f"لم ينجز أي إجراء في هذه الفترة · {od} متأخر"))
+    ok = sum(1 for a in acts if a["completed"] <= a["due"])
+    return R(pct(ok / len(acts)), pick(f"{ok} of {len(acts)} completed by the due date · {od} open past due",
+                                        f"{ok} من {len(acts)} أنجزت في الموعد · {od} مفتوحة بعد الموعد"), raw=ok / len(acts))
+
+
+def gc06(c):
+    acts, end = gc_actions(c, "Provider"), ref_end(c)
+    if not acts:
+        return R("0", pick("No corrective action on providers recorded", "لا توجد إجراءات تصحيحية على مقدمي الخدمة"), raw=0)
+    upto = [a for a in acts if c.upto(a["opened"])]
+    op = [a for a in upto if is_open(a, end)]
+    referrals = sum(1 for a in upto if (a["type"] or "").lower() == "referral for investigation")
+    keys = Counter(a["key"] for a in upto if a["key"])
+    repeat = sum(1 for n in keys.values() if n >= 2)
+    by_type = Counter(a["type"] or "-" for a in upto)
+    named = defaultdict(lambda: [0, 0, 0.0])
+    unnamed = [0, 0, 0.0]
+    for a in upto:
+        row = named[a["target"]] if a["target"] else unnamed
+        row[0] += 1
+        row[1] += 1 if is_open(a, end) else 0
+        row[2] += a["agreed"] or 0
+    rows = [[k, num(a), num(b), sar(v)] for k, (a, b, v) in sorted(named.items(), key=lambda x: -x[1][0])]
+    if unnamed[0]:
+        rows.append([pick("Not named (decision not approved, or referral)", "غير مسمى (قرار غير معتمد أو إحالة)"),
+                     num(unnamed[0]), num(unnamed[1]), sar(unnamed[2])])
+    ref_w = "referral" if referrals == 1 else "referrals"
+    rep_w = "provider" if repeat == 1 else "providers"
+    return R(num(len(op)), pick(f"open · {referrals} {ref_w} for investigation (counts only) · {repeat} {rep_w} with repeat actions",
+                                f"مفتوح · {referrals} إحالة للتحقيق (أعداد فقط) · {repeat} مقدم خدمة بإجراءات متكررة"),
+             chart=charts.hbar([(gl(k), v) for k, v in by_type.most_common()], rtl=lang() == "ar"),
+             table=table([pick("Provider", "مقدم الخدمة"), pick("Actions", "الإجراءات"), pick("Open", "مفتوح"),
+                          pick("Recovery agreed", "الاسترداد المتفق عليه")], rows), raw=len(op))
+
+
+def gc07(c):
+    acts = [a for a in gc_actions(c) if c.upto(a["opened"])]
+    rows, ta, tr = [], 0.0, 0.0
+    for tgt, lab in (("TPA", pick("TPAs", "شركات إدارة المطالبات")), ("Provider", pick("Providers", "مقدمو الخدمة"))):
+        ag = sum(a["agreed"] or 0 for a in acts if a["target_type"] == tgt)
+        rc = sum(a["recovered"] or 0 for a in acts if a["target_type"] == tgt)
+        ta, tr = ta + ag, tr + rc
+        rows.append([lab, sar(ag), sar(rc), pct(rc / ag) if ag else "-"])
+    if not ta and not tr:
+        return R("-", pick("No recovery agreed in corrective actions yet", "لا يوجد استرداد متفق عليه بعد"))
+    return R(sar(tr), pick(f"recovered of {sar(ta)} agreed ({pct(tr / ta) if ta else '-'}) · cumulative to period end",
+                           f"مسترد من {sar(ta)} متفق عليه ({pct(tr / ta) if ta else '-'}) · تراكمي حتى نهاية الفترة"),
+             table=table([pick("Target", "الجهة"), pick("Agreed", "المتفق عليه"), pick("Recovered", "المسترد"), pick("Rate", "النسبة")], rows),
+             raw=tr)
+
+
+WINDOW = 90       # days compared before the action opened and after it was completed
+MIN_AFTER = 30    # days of review data needed after completion before the effect is assessed
+
+
+def _effect(c, a, first, last):
+    """Finding level for the action's target and flag code before vs after the action. Both windows must hold at least
+    30 days of review data: 'early' when the after window is shorter, 'baseline' when the before window is."""
+    d0, d1 = dt.date.fromisoformat(a["opened"]), dt.date.fromisoformat(a["completed"])
+    b0, b1 = max((d0 - dt.timedelta(days=WINDOW)).isoformat(), first), a["opened"]
+    a0, a1 = a["completed"], min((d1 + dt.timedelta(days=WINDOW)).isoformat(), last)
+    if days(a0, a1) < MIN_AFTER:
+        return "early", None, None
+    if b1 <= b0 or days(b0, b1) < MIN_AFTER:
+        return "baseline", None, None
+    fl = [f for f in c.get("F1")["flags"] if f["status"] == "Confirmed" and f["code"].upper() == a["code"]]
+    if a["target_type"] == "TPA":
+        fl = [f for f in fl if f["tpa"] == a["target"]]
+        rev = lambda x0, x1: sum(x["reviewed"] for x in c.get("F1")["intake"] if x["tpa"] == a["target"] and x0 <= x["date"] < x1)  # noqa: E731
+        def lvl(x0, x1):
+            n = rev(x0, x1)
+            return 1000 * len({f["ref"] or f["log_id"] for f in fl if x0 <= f["date"] < x1}) / n if n else None
+    else:
+        from .parsers import norm
+        from . import deid
+        fl = [f for f in fl if f["provider"] and deid.ref(norm(f["provider"])) == a["key"]]
+        def lvl(x0, x1):
+            return len([f for f in fl if x0 <= f["date"] < x1]) / max(days(x0, x1) / 30.4, 1)
+    return "ok", lvl(b0, b1), lvl(a0, a1)
+
+
+def gc08(c):
+    if not c.get("F1"):
+        return nodata(pick("Upload the daily MARSAD register to compare findings before and after each action.",
+                           "حمّل سجل مرصد اليومي لمقارنة الملاحظات قبل كل إجراء وبعده."))
+    dates = [x["date"] for x in c.get("F1")["intake"]]
+    first, last = min(dates, default=c.today), min(max(dates, default=c.today), ref_end(c))
+    acts = [a for a in gc_actions(c) if a["completed"] and a["opened"] and a["code"] and a["completed"] <= ref_end(c)
+            and (a["target_type"] == "TPA" or a["key"])]
+    if not acts:
+        return nodata(pick("Needs completed actions with a flag code (Corrective actions: Flag code, Opened and Completed dates).",
+                           "يتطلب إجراءات منجزة برمز ملاحظة وتاريخي الفتح والإنجاز."))
+    rows, improved, assessed, early = [], 0, 0, 0
+    why = {"early": pick("Too early (under 30 days after)", "مبكر (أقل من 30 يوما بعد الإنجاز)"),
+           "baseline": pick("No baseline (under 30 days before)", "لا توجد بيانات كافية قبل الإجراء")}
+    for a in acts:
+        state, before, after = _effect(c, a, first, last)
+        name = a["target"] or pick("Provider (not named)", "مقدم خدمة (غير مسمى)")
+        unit = pick("per 1,000 encounters", "لكل 1,000 حالة") if a["target_type"] == "TPA" else pick("flags per month", "ملاحظة شهريا")
+        if state != "ok" or before is None or after is None:
+            early += 1 if state == "early" else 0
+            rows.append([name, a["code"], "-", "-", unit, why.get(state, pick("Not measurable", "غير قابل للقياس"))])
+            continue
+        assessed += 1
+        ch = (after - before) / before if before else (0 if not after else 1)
+        verdict = pick("Improved", "تحسن") if ch <= -0.1 else pick("Worse", "تراجع") if ch >= 0.1 else pick("No change", "دون تغيير")
+        improved += 1 if ch <= -0.1 else 0
+        rows.append([name, a["code"], num(round(before, 1)), num(round(after, 1)), unit, verdict])
+    head = pct(improved / assessed) if assessed else "-"
+    if not assessed:
+        head = "-"
+    return R(head, pick(f"of {assessed} assessed actions reduced later findings · {early} too early to assess",
+                        f"من {assessed} إجراء تم تقييمه خفضت الملاحظات اللاحقة · {early} مبكرة للتقييم"),
+             table=table([pick("Target", "الجهة"), pick("Flag", "الملاحظة"), pick("Before", "قبل"), pick("After", "بعد"),
+                          pick("Unit", "الوحدة"), pick("Effect", "الأثر")], rows), raw=improved / assessed if assessed else None)
+
+
+def ex11(c):
+    if not f6(c):
+        return nodata(MISSING["F6"])
+    counts, _ = actions.summary(actions.rows(f6(c), ref_end(c), tpa=c.tpa))
+    n_open = sum(counts[k] for k in actions.OPEN)
+    done = sum(1 for a in gc_actions(c) if c.inp(a["completed"]))
+    res = R(num(n_open), pick(f"open on TPAs and providers · {counts['overdue']} overdue · {counts['due_soon']} due soon · {done} completed this period",
+                              f"مفتوحة على الشركات ومقدمي الخدمة · {counts['overdue']} متأخرة · {counts['due_soon']} تستحق قريبا · {done} أنجزت في الفترة"),
+            raw=n_open)
+    if stale_note(c):
+        res["state"], res["note"] = "partial", stale_note(c)
+    return res
+
+
 FUNCS = {
     "EX-01": ex01, "EX-02": ex02, "EX-03": ex03, "EX-04": ex04, "EX-05": ex05, "EX-06": ex06, "EX-07": ex07,
     "EX-08": ex08, "EX-09": ex09, "EX-10": ex10,
@@ -1210,8 +1523,10 @@ FUNCS = {
     "GV-01": gv01, "GV-02": gv02, "GV-03": gv03, "GV-04": gv04, "GV-05": gv05, "GV-06": gv06,
     "OP-01": op01, "OP-02": op02, "OP-03": op03, "OP-04": op04, "OP-05": op05, "OP-06": op06, "OP-07": op07,
     "OP-08": op08, "OP-09": op09,
+    "EX-11": ex11, "GC-01": gc01, "GC-02": gc02, "GC-03": gc03, "GC-04": gc04, "GC-05": gc05, "GC-06": gc06, "GC-07": gc07,
+    "GC-08": gc08, "GC-09": gc09,
 }
-NEEDS = {"EX-01": "F1", "EX-02": "F1", "EX-03": "F1", "EX-04": "F1", "EX-06": "F1", "DR": "F1", "FW": "F1"}
+NEEDS = {"GC": "F6", "EX-11": "F6", "EX-01": "F1", "EX-02": "F1", "EX-03": "F1", "EX-04": "F1", "EX-06": "F1", "DR": "F1", "FW": "F1"}
 
 
 def compute(kid, c):
@@ -1242,6 +1557,9 @@ def months(data):
     if data.get("F5"):
         ms |= {x["due"][:7] for x in data["F5"]["deliverables"] if x["due"]}
         ms |= {e["month"] for e in data["F5"].get("effort") or []}
+    if data.get("F6"):
+        ms |= {a["opened"][:7] for a in data["F6"]["actions"] if a["opened"]}
+        ms |= {d["submitted"][:7] for d in data["F6"]["decisions"] if d["submitted"]}
     cur = dt.date.today().isoformat()[:7]
     return sorted(m for m in ms if m and m[:4].isdigit() and m <= cur)
 

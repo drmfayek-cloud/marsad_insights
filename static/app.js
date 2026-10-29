@@ -7,6 +7,9 @@ document.addEventListener("DOMContentLoaded", function () {
   document.addEventListener("click", function (e) {
     pops.forEach(function (d) { if (!d.contains(e.target)) { d.removeAttribute("open"); } });
   });
+  document.querySelectorAll("[data-print]").forEach(function (b) {
+    b.addEventListener("click", function () { window.print(); });
+  });
   document.querySelectorAll("[data-confirm]").forEach(function (b) {
     b.addEventListener("click", function (e) {
       if (!window.confirm(b.getAttribute("data-confirm"))) { e.preventDefault(); }

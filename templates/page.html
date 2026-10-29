@@ -85,12 +85,23 @@
       <p class="small muted">{{ pick('Encounters are screened against risk rules; the rate is not an error rate for all approvals (D-08).', 'تخضع الحالات لقواعد المخاطر، فلا تمثل النسبة معدل خطأ لكل الموافقات.') }}</p></div>
   </div>{% endif %}
 {% elif pg.sections %}
+  {% if pg.code == 'OP' %}
+  <div class="gcbar"><a class="btn" href="{{ url_for('documents', kind='deliverable') }}">{{ pick('Deliverable documents', 'مستندات المخرجات') }}</a></div>
+  {% endif %}
+  {% if pg.code == 'GC' %}
+  <div class="gcbar">
+    <a class="btn" href="{{ url_for('documents', kind='decision') }}">{{ pick('Minutes and decision documents', 'المحاضر ومستندات القرارات') }}</a>
+    <a class="btn primary" href="{{ url_for('action_tracker') }}{{ '?asof=' ~ period if period != 'all' }}">{{ pick('Open the action tracker', 'فتح متابعة الإجراءات') }}</a>
+    <a class="btn" href="{{ url_for('action_tracker_xlsx') }}{{ '?asof=' ~ period if period != 'all' }}">{{ pick('Download all actions (Excel)', 'تنزيل كل الإجراءات (Excel)') }}</a>
+  </div>
+  {% endif %}
   {% for sec in pg.sections %}{% set ks = defs|selectattr('section', 'equalto', sec.key)|list %}{% if ks %}
   <h2 class="sect">{{ pick(sec.en, sec.ar) }}</h2>
   <div class="grid{{ ' internal' if sec.key == 'internal' }}">
     {% for k in ks %}{{ kpi_card(k, results[k.id]) }}{% endfor %}
   </div>{% endif %}{% endfor %}
 {% else %}
+  {% if pg.code == 'HD' %}<div class="gcbar"><a class="btn" href="{{ url_for('documents', kind='batch') }}">{{ pick('Objection files and KPMG opinions', 'ملفات الاعتراض وآراء KPMG') }}</a></div>{% endif %}
   <div class="grid">
     {% for k in defs %}{{ kpi_card(k, results[k.id]) }}{% endfor %}
   </div>

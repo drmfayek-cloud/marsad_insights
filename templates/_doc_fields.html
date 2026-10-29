@@ -1,0 +1,21 @@
+{# shared fields of the upload and edit forms: v = current values #}
+<label>{{ pick('Title', 'العنوان') }}<input name="title" maxlength="200" value="{{ v.get('title', '') }}" placeholder="{{ pick('Defaults to the file name', 'افتراضيا اسم الملف') }}"></label>
+<label>{{ pick('Category', 'الفئة') }}<select name="category" required><option value="">-</option>
+  {% for k, c in CATS.items() %}<option value="{{ k }}" {{ 'selected' if v.get('category') == k }}>{{ pick(c[0], c[1]) }}</option>{% endfor %}</select></label>
+<label>{{ pick('Period (month)', 'الفترة (الشهر)') }}<input type="month" name="period" value="{{ v.get('period', '') }}"></label>
+<label>{{ pick('Description (optional)', 'وصف (اختياري)') }}<input name="description" maxlength="500" value="{{ v.get('description', '') }}"></label>
+<fieldset class="vis"><legend>{{ pick('Who can see it', 'من يمكنه الاطلاع') }}</legend>
+  <label class="inline"><input type="radio" name="visibility" value="kpmg" {{ 'checked' if v.get('visibility', 'kpmg') == 'kpmg' }}><span>{{ pick('KPMG only', 'KPMG فقط') }}</span></label>
+  <label class="inline"><input type="radio" name="visibility" value="shared" {{ 'checked' if v.get('visibility') == 'shared' }}><span>{{ pick('KPMG and CNHI', 'KPMG والمركز') }}</span></label>
+  <p class="small muted">{{ pick('For a document shared with CNHI, follow the provider naming rule (D-23) in the title and description.', 'للمستندات المشاركة مع المركز، التزم بقاعدة تسمية مقدمي الخدمة (D-23) في العنوان والوصف.') }}</p>
+</fieldset>
+<div class="linkgrid">
+  {% for k, kv in KINDS.items() %}{% set chosen = (v.get('links') or [])|selectattr(0, 'equalto', k)|map(attribute=1)|list %}
+  <label>{{ pick('Link to', 'ربط بـ') }} {{ pick(kv[0], kv[1]) }}
+    <select name="link_{{ k }}" multiple size="5">
+      {% for ref, lab in options[k] %}<option value="{{ ref }}" {{ 'selected' if ref in chosen }}>{{ lab }}</option>{% endfor %}
+      {% for ref in chosen if ref not in options[k]|map(attribute=0)|list %}<option value="{{ ref }}" selected>{{ ref }}</option>{% endfor %}
+    </select></label>
+  {% endfor %}
+</div>
+<p class="small muted">{{ pick('Hold Ctrl (Cmd on a Mac) to choose several. Lists come from the published registers.', 'اضغط Ctrl لاختيار أكثر من عنصر. القوائم من السجلات المنشورة.') }}</p>

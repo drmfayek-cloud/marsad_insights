@@ -1,5 +1,5 @@
 #!/bin/sh
-# Nightly backup of the data volume (database, de-identified datasets, keys). Keep 30 days; copy to a second in-Kingdom location.
+# Nightly backup of the data volume (database, de-identified datasets, documents library, keys). Keep 30 days; copy to a second in-Kingdom location.
 set -e
 DEST=/var/backups/marsad-insights
 mkdir -p "$DEST"
